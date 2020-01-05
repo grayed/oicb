@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: latest Ubuntu-based build
 
 on: [push]
 
@@ -9,6 +9,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v1
+    - name: install dependencies
+      run: sudo apt-get install libncurses-dev libreadline-dev
     - name: create build directory
       run: mkdir build
     - name: configure
