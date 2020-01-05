@@ -1,0 +1,5 @@
+oicb is a minimalistic replacement for icb(1) command-line client.  oicb lacks
+many (unsecure) features, but offers one big advantage: screen is not blocked
+while you're typing.
+
+The code is under 2-clause BSD license, see the LICENSE file.
