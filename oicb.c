@@ -136,6 +136,8 @@ void	 proceed_cmd_result_end(char *msg, size_t len);
 void	 proceed_user_list(char *msg, size_t len);
 void	 proceed_group_list(char *msg, size_t len);
 
+char	*null_completer(const char *text, int state);
+
 struct history_file	*get_history_file(char *path);
 char	*get_save_path_for(char type, const char *who);
 void	 save_history(char type, const char *who, const char *msg);
@@ -1012,6 +1014,11 @@ get_next_icb_msg(size_t *msglen) {
 	return (char*)(buf + 1);
 }
 
+char *
+null_completer(const char *text, int state) {
+	return NULL;
+}
+
 __dead void
 usage(const char *msg) {
 	if (msg)
@@ -1207,7 +1214,9 @@ main(int argc, char **argv) {
 
 	rl_callback_handler_install("", &proceed_user_input);
 	atexit(&rl_callback_handler_remove);
-	rl_bind_key(CTRL('t'), &siginfo_cmd);
+
+	// disable completion, or readline will try to access file system
+	rl_completion_entry_function = null_completer;
 
 #ifdef SIGINFO
 	if (sigaction(SIGINFO, NULL, &sa) == -1)
