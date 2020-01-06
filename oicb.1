@@ -1,0 +1,74 @@
+.\"     $OpenBSD$
+.\"
+.\" Copyright (c) 2020 Vadim Zhukov <zhuk@openbsd.org>
+.\"
+.\" Permission to use, copy, modify, and distribute this software for any
+.\" purpose with or without fee is hereby granted, provided that the above
+.\" copyright notice and this permission notice appear in all copies.
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+.\" WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+.\" MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+.\" ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+.\" WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+.\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+.\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.Dd $Mdocdate$
+.Dt OICB 1
+.Os
+.Sh NAME
+.Nm oicb
+.Nd command-line ICB client
+.Sh SYNOPSIS
+.Nm oicb
+.Op Fl dH
+.Op Fl t Ar secs
+.Oo Ar nick@ Oc Ns Ar host Ns Oo Ar :port Oc
+.Ar room
+.Sh DESCRIPTION
+The
+.Nm
+is a minimalistic command-line ICB client.
+The options are as follows:
+.Bl -tag -width Ds
+.It Fl d
+Debug mode.
+.It Fl H
+Disable local chat history saving (see below).
+.It Fl t Ar secs
+Set server timeout value to
+.Ar secs .
+The default is 30 (seconds).
+.It Ar nick
+Nickname to use on server.
+By default user's login name is used, as returned by
+.Xr getlogin 2 .
+.It Ar host
+The ICB server host name or address.
+.It Ar port
+The ICB server TCP port to use, defaulting to 7326.
+.It Ar room
+Name of the room to enter upon login.
+.El
+.Sh CHAT HISTORY
+By default,
+.Nm
+saves chat history to
+.Pa ~/.oicb/logs/ Ns Ar host
+directory.
+Chatroom logs are prefixed with
+.Sq room-
+and private chats are prefixed with
+.Sq private- .
+.Sh SEE ALSO
+Other ICB implementations:
+.Lk http://www.icb.net/ .
+.Pp
+The ICB protocol description:
+.Lk ftp://ftp.icb.net/pub/icb/src/icbd/Protocol.html
+.Sh AUTHORS
+.An Vadim Zhukov Aq Mt zhuk@openbsd.org
+.Sh BUGS
+Using IPv6 address together with
+.Ar port
+will not work.

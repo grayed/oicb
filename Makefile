@@ -3,9 +3,11 @@
 # To build oicb under other OSes, please use CMake or write your own Makefile.
 #
 PROG =		oicb
-NOMAN =		1
 DPADD +=	${LIBREADLINE} ${LIBCURSES}
 LDADD +=	-lreadline -lcurses
+
+BINDIR ?=	/usr/local/bin
+MANDIR ?=	/usr/local/man/man
 
 CFLAGS +=	-Wall -Werror
 

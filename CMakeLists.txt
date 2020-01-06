@@ -52,3 +52,9 @@ else()
 		COMPILE_OPTIONS "-include${CMAKE_CURRENT_SOURCE_DIR}/compat.h"
 		)
 endif()
+
+# man handling
+set(MANDIR "${CMAKE_INSTALL_PREFIX}/man" CACHE PATH "Prefix to directory where to install manual page")
+message(STATUS "Manual page will be installed under ${MANDIR}")
+
+install(FILES ${CMAKE_PROJECT_NAME}.1 DESTINATION "${MANDIR}/man1")
