@@ -29,9 +29,10 @@ else
 fi
 
 pax -wzv \
-	-s ',^\./.git\(/.*\)*$,,' \
+	-s ',^\./.git.*,,' \
 	-s ',^\./obj\(/.*\)*$,,' \
 	-s ',^\./build.*,,' \
+	-s ",^./${0##*/}\$,," \
 	-s "/^./oicb-${v}/" \
 	. >"$arc_path/$arc_name"
 echo "archive saved to $arc_path/$arc_name"
