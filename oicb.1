@@ -45,6 +45,8 @@ By default user's login name is used, as returned by
 .Xr getlogin 2 .
 .It Ar host
 The ICB server host name or address.
+IPv6 addresses must be enclosed in square brackets, to disambiguate
+with port specification.
 .It Ar port
 The ICB server TCP port to use, defaulting to 7326.
 .It Ar room
@@ -68,7 +70,3 @@ The ICB protocol description:
 .Lk ftp://ftp.icb.net/pub/icb/src/icbd/Protocol.html
 .Sh AUTHORS
 .An Vadim Zhukov Aq Mt zhuk@openbsd.org
-.Sh BUGS
-Using IPv6 address together with
-.Ar port
-will not work.

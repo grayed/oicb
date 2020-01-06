@@ -1072,7 +1072,7 @@ icb_connect(const char *addr, const char *port) {
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	if ((ec = getaddrinfo(addr, port, &hints, &res)) != 0)
-		errx(1, "could not resolve hostname: %s", gai_strerror(ec));
+		errx(1, "could not resolve host/port name: %s", gai_strerror(ec));
 	for (p = res; p != NULL; p = p->ai_next) {
 		if ((sock = socket(p->ai_family, p->ai_socktype|SOCK_NONBLOCK,
 		    p->ai_protocol)) == -1) {
@@ -1175,9 +1175,22 @@ main(int argc, char **argv) {
 	}
 	if (strlen(nick) >= NICKNAME_MAX)
 		usage("too long nickname");
-	/* XXX will fail for IPv6 addresses */
-	if ((port = strchr(hostname, ':')) != NULL)
-		*port++ = '\0';
+
+	if (hostname[0] == '[') {
+		char	*hostend;
+
+		hostname++;
+		hostend = strrchr(hostname, ']');
+		if (hostend == NULL ||
+		    (hostend[1] != '\0' && hostend[1] != ':'))
+			usage("invalid hostname specification");
+		if (hostend[1] == ':')
+			port = hostend + 2;
+		*hostend = '\0';
+	} else {
+		if ((port = strrchr(hostname, ':')) != NULL)
+			*port++ = '\0';
+	}
 
 	icb_connect(hostname, port);
 	if (fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK) == -1)
