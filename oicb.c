@@ -122,7 +122,9 @@ void	 push_icb_msg_extended(char type, const char *src, size_t len);
 char	*get_next_icb_msg(size_t *msglen);
 void	 usage(const char *msg);
 void	 update_pollfds(void);
+#ifdef SIGINFO
 void	 siginfo_handler(int sig);
+#endif
 int	 siginfo_cmd(int count, int key);
 void	 prepare_stdout(void);
 void	 restore_rl(void);
@@ -158,10 +160,12 @@ struct cmd_result_handler {
 };
 
 
+#ifdef SIGINFO
 void
 siginfo_handler(int sig) {
 	want_info = 1;
 }
+#endif
 
 int
 siginfo_cmd(int count, int key) {
@@ -1174,11 +1178,13 @@ main(int argc, char **argv) {
 	atexit(&rl_callback_handler_remove);
 	rl_bind_key(CTRL('t'), &siginfo_cmd);
 
+#ifdef SIGINFO
 	if (sigaction(SIGINFO, NULL, &sa) == -1)
 		err(1, "sigaction(SIGINFO, NULL)");
 	sa.sa_handler = siginfo_handler;
 	if (sigaction(SIGINFO, &sa, NULL) == -1)
 		err(1, "sigaction(SIGINFO, &sa)");
+#endif
 
 	while (!want_exit) {
 		if (want_info) {
