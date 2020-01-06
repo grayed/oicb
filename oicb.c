@@ -1105,6 +1105,24 @@ icb_connect(const char *addr, const char *port) {
 	err(1, "could not connect");
 }
 
+void
+pledge_me() {
+#ifdef HAVE_UNVEIL
+	char	history_path[PATH_MAX];
+
+	snprintf(history_path, PATH_MAX, "%s/.oicb/logs/%s", getenv("HOME"), hostname);
+	if (unveil(history_path, "rwc") == -1)
+		err(1, "unveil");
+	if (unveil(NULL, NULL) == -1)
+		err(1, "unveil");
+#endif
+
+#ifdef HAVE_PLEDGE
+	if (pledge("stdio wpath cpath tty", NULL) == -1)
+		err(1, "pledge");
+#endif
+}
+
 int
 main(int argc, char **argv) {
 	struct sigaction sa;
@@ -1185,6 +1203,8 @@ main(int argc, char **argv) {
 	if (sigaction(SIGINFO, &sa, NULL) == -1)
 		err(1, "sigaction(SIGINFO, &sa)");
 #endif
+
+	pledge_me();
 
 	while (!want_exit) {
 		if (want_info) {

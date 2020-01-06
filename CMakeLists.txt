@@ -53,6 +53,16 @@ else()
 		)
 endif()
 
+include(CheckSymbolExists)
+check_symbol_exists(pledge unistd.h HAVE_PLEDGE)
+if (HAVE_PLEDGE)
+	add_definitions(-DHAVE_PLEDGE)
+endif()
+check_symbol_exists(unveil unistd.h HAVE_UNVEIL)
+if (HAVE_UNVEIL)
+	add_definitions(-DHAVE_UNVEIL)
+endif()
+
 # man handling
 set(MANDIR "${CMAKE_INSTALL_PREFIX}/man" CACHE PATH "Prefix to directory where to install manual page")
 message(STATUS "Manual page will be installed under ${MANDIR}")

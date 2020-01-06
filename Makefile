@@ -9,7 +9,7 @@ LDADD +=	-lreadline -lcurses
 BINDIR ?=	/usr/local/bin
 MANDIR ?=	/usr/local/man/man
 
-CFLAGS +=	-Wall -Werror
+CFLAGS +=	-Wall -Werror -DHAVE_PLEDGE -DHAVE_UNVEIL
 
 # debugging helpers
 .PHONY: srv tcpdump test test2
