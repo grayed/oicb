@@ -3,3 +3,11 @@ many (unsecure) features, but offers one big advantage: screen is not blocked
 while you're typing.
 
 The code is under 2-clause BSD license, see the LICENSE file.
+
+Building instructions:
+
+OpenBSD: simple "make" should suffice, although you may want run "make obj" first.
+
+Generic way: usual CMake-based build: "mkdir -p build && cd build && cmake .. && make".
+You'll need libreadline-dev and libncurses-dev installed.
+On non-BSD systems you'll need libbsd-dev as well.
