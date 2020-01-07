@@ -431,13 +431,13 @@ save_history(char type, const char *who, const char *msg) {
 
 	datasz = datelen + strlen(who) + 2 + strlen(msg) + 1;
 	it = calloc(1, sizeof(struct icb_task) + datasz);
-	it->it_len = datasz;
 	if (it == NULL)
 		goto err;
 	strftime(it->it_data, datasz, "%Y-%m-%d %H:%M:%S ", now);
 	strlcat(it->it_data, who, datasz);
 	strlcat(it->it_data, ": ", datasz);
 	strlcat(it->it_data, msg, datasz);
+	it->it_len = datasz;
 	it->it_data[datasz - 1] = '\n';
 	SIMPLEQ_INSERT_TAIL(&hf->hf_tasks, it, it_entry);
 	return;
