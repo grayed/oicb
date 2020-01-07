@@ -1,0 +1,34 @@
+
+====================
+HEAD
+====================
+
+* Fix minor (we exit anyway) TOCTTOU in save_history().
+
+====================
+v.1.1.1
+====================
+
+* Fix crash happening when attempting to complete under unveil() due to
+  libreadline being too complaisant.
+
+====================
+v.1.1.0
+====================
+
+* Now there is a manual page, oicb(1).
+* pledge(2) and unveil(2) are used when supported.
+* IPv6 addresses should work as host names now (when specifying IPv6
+  with port, host must be in square brackets).
+
+====================
+v.1.0.1
+====================
+
+* Fix build on Debian.
+
+====================
+v.1.0
+====================
+
+* Initial release.
