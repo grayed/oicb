@@ -1135,7 +1135,9 @@ pledge_me() {
 
 int
 main(int argc, char **argv) {
+#ifdef SIGINFO
 	struct sigaction sa;
+#endif
 	size_t		 msglen;
 	time_t		 ts_lastnetinput, t;
 	int		 ch, i, net_timeout, poll_timeout, max_pings;
