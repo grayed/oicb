@@ -64,10 +64,8 @@ if (HAVE_UNVEIL)
 endif()
 
 if (CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL GNU)
-	list(APPEND CMAKE_C_FLAGS -Wall)
-	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-		list(APPEND CMAKE_C_FLAGS_DEBUG -Werror)
-	endif()
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Werror")
 endif()
 
 # man handling
