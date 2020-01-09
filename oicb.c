@@ -1118,11 +1118,18 @@ icb_connect(const char *addr, const char *port) {
 void
 pledge_me() {
 #ifdef HAVE_UNVEIL
-	char	history_path[PATH_MAX];
+	if (enable_history) {
+		char	history_path[PATH_MAX];
 
-	snprintf(history_path, PATH_MAX, "%s/.oicb/logs/%s", getenv("HOME"), hostname);
-	if (unveil(history_path, "rwc") == -1)
-		err(1, "unveil");
+		snprintf(history_path, PATH_MAX, "%s/.oicb/logs/%s",
+		    getenv("HOME"), hostname);
+		if (create_dir_for(history_path) == -1 ||
+		    (mkdir(history_path, 0777) == -1 && errno != EEXIST))
+			err(1, "mkdir");
+		if (unveil(history_path, "rwc") == -1)
+			err(1, "unveil");
+	}
+
 	if (unveil(NULL, NULL) == -1)
 		err(1, "unveil");
 #endif
