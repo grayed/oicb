@@ -17,5 +17,5 @@ jobs:
       run: cmake -DCMAKE_BUILD_TYPE=Debug ..
       working-directory: build
     - name: make
-      run: make
+      run: make VERBOSE=1
       working-directory: build
