@@ -103,6 +103,7 @@ int		 o_rl_point, o_rl_mark;
 int		 pings_sent = 0;
 int		 last_cmd_has_nl = 0;
 int		 enable_history = 1;
+char		 history_path[PATH_MAX];
 
 enum SrvFeature {
 	Ping	= 0x01,
@@ -1118,18 +1119,11 @@ icb_connect(const char *addr, const char *port) {
 void
 pledge_me() {
 #ifdef HAVE_UNVEIL
-	if (enable_history) {
-		char	history_path[PATH_MAX];
 
-		snprintf(history_path, PATH_MAX, "%s/.oicb/logs/%s",
-		    getenv("HOME"), hostname);
-		if (create_dir_for(history_path) == -1 ||
-		    (mkdir(history_path, 0777) == -1 && errno != EEXIST))
-			err(1, "mkdir");
+	if (enable_history) {
 		if (unveil(history_path, "rwc") == -1)
 			err(1, "unveil");
 	}
-
 	if (unveil(NULL, NULL) == -1)
 		err(1, "unveil");
 #endif
@@ -1237,6 +1231,19 @@ main(int argc, char **argv) {
 	if (sigaction(SIGINFO, &sa, NULL) == -1)
 		err(1, "sigaction(SIGINFO, &sa)");
 #endif
+
+	if (enable_history) {
+		snprintf(history_path, PATH_MAX, "%s/.oicb/logs/%s",
+		    getenv("HOME"), hostname);
+		if (create_dir_for(history_path) == -1 ||
+		    (mkdir(history_path, 0777) == -1 && errno != EEXIST)) {
+			warn("cannot make sure history directory \"%s\" exists",
+			    history_path);
+			warnx("history saving is disabled");
+			enable_history = 0;
+			memset(history_path, 0, PATH_MAX);
+		}
+	}
 
 	pledge_me();
 
