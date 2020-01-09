@@ -51,5 +51,9 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+# Build directories
 build
 obj
+
+# Qt Creator specific
+*.user
