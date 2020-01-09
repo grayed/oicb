@@ -63,6 +63,13 @@ if (HAVE_UNVEIL)
 	add_definitions(-DHAVE_UNVEIL)
 endif()
 
+if (CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL GNU)
+	list(APPEND CMAKE_C_FLAGS -Wall)
+	if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+		list(APPEND CMAKE_C_FLAGS_DEBUG -Werror)
+	endif()
+endif()
+
 # man handling
 set(MANDIR "${CMAKE_INSTALL_PREFIX}/man" CACHE PATH "Prefix to directory where to install manual page")
 message(STATUS "Manual page will be installed under ${MANDIR}")
