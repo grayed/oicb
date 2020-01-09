@@ -373,8 +373,7 @@ get_save_path_for(char type, const char *who) {
 		prefix = "private-";
 	}
 
-	rv = asprintf(&path, "%s/.oicb/logs/%s/%s%s.log",
-	     getenv("HOME"), hostname, prefix, who);
+	rv = asprintf(&path, "%s/%s%s.log", history_path, prefix, who);
 	if (rv == -1)
 		return NULL;
 	return path;
