@@ -3,7 +3,12 @@
 HEAD
 ====================
 
+====================
+v.1.1.2
+====================
+
 * Fix minor (we exit anyway) TOCTTOU in save_history().
+* Fix build under GCC, and disable -Werror; issue #1.
 
 ====================
 v.1.1.1
