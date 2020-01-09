@@ -697,11 +697,13 @@ IP address/domain
 	} else {
 		nicklen = strlen(nick);
 	}
+	(void)nicklen;	// TODO
 	push_stdout_msg(nick);
 	if (p == NULL)
 		goto end;
 	p++;
 	idle = strtoll(p, &endptr, 10);
+	(void)idle;	// TODO
 	*endptr = '\0';
 	push_stdout_msg(p);
 	push_stdout_msg("s");
@@ -875,6 +877,7 @@ cmd_handler_found:
 			}
 		}
 		// TODO use srvid
+		(void)srvid;
 		if (strcmp(msg, "1") != 0)
 			err(2, "unsupported protocol version");
 		if (asprintf(&p, "%1$s\001%1$s\001%2$s\001login\001", nick, room) == -1)
@@ -1136,7 +1139,7 @@ main(int argc, char **argv) {
 	size_t		 msglen;
 	time_t		 ts_lastnetinput, t;
 	int		 ch, i, net_timeout, poll_timeout, max_pings;
-	char		*msg, *port;
+	char		*msg, *port = NULL;
 	const char	*errstr;
 
 	SIMPLEQ_INIT(&tasks_stdout);
