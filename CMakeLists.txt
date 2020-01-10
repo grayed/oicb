@@ -54,6 +54,8 @@ else()
 endif()
 
 include(CheckSymbolExists)
+include(CMakePushCheckState)
+
 check_symbol_exists(pledge unistd.h HAVE_PLEDGE)
 if (HAVE_PLEDGE)
 	add_definitions(-DHAVE_PLEDGE)
@@ -62,6 +64,12 @@ check_symbol_exists(unveil unistd.h HAVE_UNVEIL)
 if (HAVE_UNVEIL)
 	add_definitions(-DHAVE_UNVEIL)
 endif()
+
+cmake_push_check_state()
+list(APPEND CMAKE_REQUIRED_INCLUDES ${Readline_INCLUDE_DIRS})
+list(APPEND CMAKE_REQUIRED_LIBRARIES ${Readline_LIBRARIES})
+check_symbol_exists(rl_bind_keyseq readline/readline.h HAVE_RL_BIND_KEYSEQ)
+cmake_pop_check_state()
 
 if (CMAKE_C_COMPILER_ID STREQUAL Clang OR CMAKE_C_COMPILER_ID STREQUAL GNU)
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")

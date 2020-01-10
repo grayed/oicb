@@ -49,6 +49,10 @@
 # define NICKNAME_MAX LOGIN_NAME_MAX
 #endif
 
+#ifndef HAVE_RL_BIND_KEYSEQ
+static inline int	rl_bind_keyseq(const char *keyseq, int(*function)(int, int));
+#endif
+
 
 enum {
 	Connecting,
@@ -105,6 +109,11 @@ int		 last_cmd_has_nl = 0;
 int		 enable_history = 1;
 char		 history_path[PATH_MAX];
 
+#define	PRIV_CHATS_MAX	5
+char		 priv_chats_nicks[PRIV_CHATS_MAX][NICKNAME_MAX];
+int		 priv_chats_cnt;
+int		 last_chat_was_priv;
+
 enum SrvFeature {
 	Ping	= 0x01,
 	ExtPkt	= 0x02,
@@ -143,6 +152,16 @@ struct history_file	*get_history_file(char *path);
 char	*get_save_path_for(char type, const char *who);
 void	 save_history(char type, const char *who, const char *msg);
 void	 proceed_history(void);
+
+int	priv_cmd_end(const char *line);
+int	priv_nick_start(const char *line);
+void	update_nick_history(const char *cmdargs);
+int	list_priv_chats_nicks(int foo, int bar);
+int	cycle_priv_chats(int forward);
+
+// readline wrappers
+int	cycle_priv_chats_forward(int foo, int bar);
+int	cycle_priv_chats_backward(int foo, int bar);
 
 
 typedef void (*icb_msg_handler)(char *, size_t);
@@ -406,6 +425,278 @@ err:
 	return NULL;
 }
 
+// Input: command line, starting with /m or /msg.
+// Returns: index where command name ends, or 0 if not /m or /msg.
+int
+priv_cmd_end(const char *line) {
+	const char	*p = line;
+
+	if (p[0] != '/' || p[1] != 'm')
+		return 0;
+	p += 2;
+	if (p[0] == 's' && p[1] == 'g')
+		p += 2;
+	if (*p != '\0' && !isspace(*p))
+		return 0;
+	return (int)(p - line);
+}
+
+// Input: command line, starting with /m or /msg.
+// Return: index of nickname, or 0 if not /m or /msg, or no nickname.
+int
+priv_nick_start(const char *line) {
+	size_t	idx;
+
+	if ((idx = priv_cmd_end(line)) == 0)
+		return 0;
+	while (isspace(line[idx]))
+		idx++;
+	if (line[idx] == '\0')
+		return 0;
+	return idx;
+}
+
+// Input: private message command args, or NULL for public message.
+void
+update_nick_history(const char *cmdargs) {
+	if (debug >= 2)
+		warnx("%s: cmdargs='%s'", __func__, cmdargs);
+	if ((last_chat_was_priv = (cmdargs != NULL))) {
+		size_t	nicklen;
+		int	i;
+		char	tmp[NICKNAME_MAX];
+
+		while (isspace(*cmdargs))
+			cmdargs++;
+		for (i = 0; cmdargs[i] != '\0' && !isspace(cmdargs[i]); i++)
+			;
+		if (i >= NICKNAME_MAX) {
+			push_stdout_msg(getprogname());
+			push_stdout_msg(": warning: nickname is too long\n");
+			return;
+		}
+		nicklen = (size_t)i;
+
+		if (priv_chats_cnt > 0 &&
+		    strncmp(priv_chats_nicks[0], cmdargs, nicklen) == 0 &&
+		    priv_chats_nicks[0][nicklen] == '\0')
+			return;		// already topmost one
+		for (i = 1; i < priv_chats_cnt; i++) {
+			if (strncmp(priv_chats_nicks[i], cmdargs, nicklen) == 0) {
+				if (debug >=2)
+					warnx("%s: found %s", __func__, priv_chats_nicks[i]);
+				// make current nick the newest one
+				memcpy(tmp, priv_chats_nicks[i], NICKNAME_MAX);
+				memmove(priv_chats_nicks[1], priv_chats_nicks[0], i * NICKNAME_MAX);
+				memcpy(priv_chats_nicks[0], tmp, NICKNAME_MAX);
+				return;
+			}
+		}
+
+		if (debug >= 2)
+			warnx("%s: copying first %d bytes from '%s' to %p", __func__, (int)nicklen, cmdargs, priv_chats_nicks[0]);
+
+		// add nick to history, possibly kicking out oldest one
+		memmove(priv_chats_nicks[1], priv_chats_nicks[0],
+		    (PRIV_CHATS_MAX - 1) * NICKNAME_MAX);
+		memcpy(priv_chats_nicks[0], cmdargs, nicklen);
+		memset(priv_chats_nicks[0] + nicklen, 0, NICKNAME_MAX - nicklen);
+		if (priv_chats_cnt < PRIV_CHATS_MAX - 1)
+			priv_chats_cnt++;
+	}
+}
+
+//
+// The logic as follows:
+//
+//  1. If private chat nicknames history is empty, just beep.
+//
+//  2. If this is a public chat message, switch to last used private chat.
+//
+//  3. If this is not either public or private chat line, just beep.
+//
+//  4. If this is a private chat command without nickname, switch to last
+//      used private chat.
+//
+//  5. If the private chat nickname is the oldest used in nick history,
+//     clear private command, making the message public.
+//
+//  6. If private chat nickname is not remembered, but there is remembered
+//     nickname which starts like this, fill the latter nickname fully.
+//
+//  7. If there is no matching private chat nickname in history, switch to the
+//     last used private chat.
+//
+//  8. Now this is a non-oldest remembered private chat nickname: replace
+//     nickname in private commmand with older one.
+//
+int
+cycle_priv_chats(int forward) {
+	size_t		nicklen;	// length of entered nickname
+	int		i;
+	int		newidx;		// index from history to use
+	int		oldcurpos;	// initial rl_point value
+	int		nickpos;	// offset of nick in entered line
+	const char	*buf;		// because rl_line_buffer name is too long
+
+	if (debug >= 2)
+		warnx("%s: forward=%d\n", __func__, forward);
+
+	if (priv_chats_cnt == 0) {
+		// (1)
+		putchar('\007');
+		return 0;
+	}
+
+	oldcurpos = rl_point;
+	buf = rl_line_buffer;
+	// Rememeber that after calling rl_*_text() the value of
+	// rl_line_buffer may change.
+
+	if (buf[0] == '/') {
+		// (3), (4), (5), (6), (7) or (8)
+		if (debug >= 2)
+			warnx("%s: 3-4-5-6-7-8 buf='%s'", __func__, buf);
+
+		if (!priv_cmd_end(buf)) {
+			// (3)
+			putchar('\007');
+			return 0;
+		}
+
+		nickpos = priv_nick_start(buf);
+		if (nickpos > 0) {
+			const char	*priv_nick = buf + nickpos;
+
+			// (5), (6), (7) or (8)
+			if (debug >= 2)
+				warnx("%s: 5-6-7-8 nickpos=%d", __func__, nickpos);
+
+			for (i = 0; priv_nick[i] != '\0' && !isspace(priv_nick[i]); i++)
+				;
+			nicklen = (size_t)i;
+			for (i = 0; i < priv_chats_cnt; i++)
+				if (nicklen == strlen(priv_chats_nicks[i]) &&
+				   memcmp(priv_nick, priv_chats_nicks[i], nicklen) == 0)
+					break;
+			if (( forward && i == priv_chats_cnt - 1) ||
+			    (!forward && i == 0)) {
+				// (5)
+				// "+ 1" for space after nick; if there is none,
+				// readline will handle it fine.
+				rl_delete_text(0, nickpos + (int)nicklen + 1);
+				rl_point -= nickpos + (int)nicklen + 1;
+				if (rl_point < 0)
+					rl_point = 0;
+				return 0;
+			}
+
+			if (i == priv_chats_cnt) {
+				// (6) or (7): do prefix matching check
+				if (forward) {
+					for (i = 0; i < priv_chats_cnt; i++)
+						if (strncmp(priv_nick, priv_chats_nicks[i], nicklen) == 0) {
+							// (6)
+							newidx = i;
+							goto replace_nick;
+						}
+				} else {
+					for (i = priv_chats_cnt - 1; i >= 0; i--)
+						if (strncmp(priv_nick, priv_chats_nicks[i], nicklen) == 0) {
+							// (6)
+							newidx = i;
+							goto replace_nick;
+						}
+				}
+
+				// (7)
+				newidx = forward ? 0 :  priv_chats_cnt - 1;
+				goto replace_nick;
+			}
+
+			// (8)
+			newidx = i + (forward ? 1 : -1);
+			goto replace_nick;
+		}
+
+		// (4)
+		nicklen = 0;
+		newidx = 0;
+	} else {
+		// (2)
+		rl_point = 0;
+		rl_insert_text("/m ");
+		nickpos = 3;
+		nicklen = 0;
+		newidx = forward ? 0 : priv_chats_cnt - 1;
+		oldcurpos += nickpos + 1;	// "+ 1" for space
+	}
+
+	// (2), (4), (6), (7) or (8)
+
+replace_nick:
+	if (debug >= 2) {
+		warnx("%s: replace_nick rl_line_buffer='%s' rl_point=%d oldcurpos=%d nickpos=%d nicklen=%zu",
+		    __func__, rl_line_buffer, rl_point, oldcurpos, nickpos, nicklen);
+	}
+
+	if (nicklen)
+		rl_delete_text(nickpos, nickpos + (int)nicklen + 1);
+	rl_point = nickpos;
+	rl_insert_text(priv_chats_nicks[newidx]);
+	rl_insert_text(" ");
+
+	// restoring cursor position
+	if (oldcurpos < nickpos)
+		rl_point = oldcurpos;
+	else if (oldcurpos > nickpos + (int)nicklen)
+		rl_point = oldcurpos
+		    + (int)strlen(priv_chats_nicks[newidx])
+		    - (int)nicklen;
+	else // cursors was inside nickname, play safe
+		rl_point = nickpos + nicklen;
+	return 0;
+}
+
+int
+cycle_priv_chats_forward(int foo, int bar) {
+	(void)foo;
+	(void)bar;
+	cycle_priv_chats(0);
+	return 0;
+}
+
+int
+cycle_priv_chats_backward(int foo, int bar) {
+	(void)foo;
+	(void)bar;
+	cycle_priv_chats(1);
+	return 0;
+}
+
+int
+list_priv_chats_nicks(int foo, int bar) {
+	int	i;
+	char	buf[100];
+
+	(void)foo;
+	(void)bar;
+
+	if (priv_chats_cnt == 0) {
+		push_stdout_msg("there are no private chats yet\n");
+		return 0;
+	}
+
+	snprintf(buf, sizeof(buf), "there are %d private chats:\n",
+	    priv_chats_cnt);
+	push_stdout_msg(buf);
+	for (i = 0; i < priv_chats_cnt; i++) {
+		push_stdout_msg("  * ");
+		push_stdout_msg(priv_chats_nicks[i]);
+		push_stdout_msg("\n");
+	}
+	return 0;
+}
 
 void	
 save_history(char type, const char *who, const char *msg) {
@@ -564,13 +855,18 @@ proceed_user_input(char *line) {
 		n = strcspn(line, " \t");
 		if (line[n])
 			line[n] = '\001';
-		if (n == 1 && line[0] == 'm')
+
+		if ((n == 1 && line[0] == 'm') ||
+		    (n == 3 && memcmp(line, "msg", 3) == 0)) {
+			update_nick_history(&line[n + 1]);
 			save_history('c', "me", &line[n + 1]);
+		}
 		push_icb_msg('h', line, strlen(line));
 		state = CommandSent;
 		return;
 	}
 	// public message
+	update_nick_history(NULL);
 	save_history('b', "me", line);
 	push_icb_msg('b', line, strlen(line));
 }
@@ -1133,6 +1429,14 @@ pledge_me() {
 #endif
 }
 
+#ifndef HAVE_RL_BIND_KEYSEQ
+static inline int
+rl_bind_keyseq(const char *keyseq, int(*function)(int, int))
+{
+	return rl_generic_bind(ISFUNC, keyseq, (char *)function, rl_get_keymap());
+}
+#endif
+
 int
 main(int argc, char **argv) {
 #ifdef SIGINFO
@@ -1222,6 +1526,10 @@ main(int argc, char **argv) {
 
 	// disable completion, or readline will try to access file system
 	rl_completion_entry_function = null_completer;
+
+	rl_bind_key('\t', cycle_priv_chats_forward);
+	rl_bind_keyseq("\\e[Z", cycle_priv_chats_backward);
+	rl_bind_key(CTRL('p'), list_priv_chats_nicks);
 
 #ifdef SIGINFO
 	if (sigaction(SIGINFO, NULL, &sa) == -1)
