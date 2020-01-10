@@ -670,7 +670,7 @@ int
 cycle_priv_chats_forward(int foo, int bar) {
 	(void)foo;
 	(void)bar;
-	cycle_priv_chats(0);
+	cycle_priv_chats(1);
 	return 0;
 }
 
@@ -678,7 +678,7 @@ int
 cycle_priv_chats_backward(int foo, int bar) {
 	(void)foo;
 	(void)bar;
-	cycle_priv_chats(1);
+	cycle_priv_chats(0);
 	return 0;
 }
 
