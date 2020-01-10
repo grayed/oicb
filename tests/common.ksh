@@ -7,6 +7,7 @@ ICB_PIDS=
 TEST_LOG="$OICB_DIR/${0##*/}.log"
 TEST_NAME=${0##*/test-}
 FAIL_CNT=0
+ICB_RUN_NUM=
 
 icbd=$(command -v icbd)
 if [ $? -ne 0 ]; then
@@ -20,25 +21,28 @@ rm -Rf "${OICB_DIR}/.oicb"
 # 1. Inserts @host:port into penultimate argument
 # 2. Runs expect(1) that in turn runs oicb and read script from stdin.
 run_oicb() {
-	local args idx
+	local args idx expect_log fail_text
 
 	idx=$(($# - 2))
 	set -A args -- "$@"
 	login=${args[$idx]}
 	args[$idx]="${login}@127.0.0.1:$ICBD_PORT"
 
+	expect_log="${TEST_LOG}.expect${ICB_RUN_NUM:+-$ICB_RUN_NUM}"
+	fail_text="FAIL${ICB_RUN_NUM:+ $ICB_RUN_NUM}"
+
 	{ {
 		echo "set timeout 3"
-		echo "log_file -a -noappend \"${TEST_LOG}.expect\""
+		echo "log_file -a -noappend \"${expect_log}\""
 		echo "log_user 0"
 		echo 'set oicb_args [lrange $argv 0 end]'
 		echo "spawn -noecho \"${OICB_DIR}/oicb\" {*}\$oicb_args"
 		cat
 	} | expect -b - -- "${args[@]}"; } || {
 		FAIL_CNT=$(($FAIL_CNT + 1))
-		echo "FAIL"
+		echo "$fail_text"
 		echo "expect log:"
-		cat "${TEST_LOG}.expect"
+		cat "$expect_log"
 		echo
 		return 1
 	}
