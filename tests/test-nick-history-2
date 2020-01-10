@@ -19,8 +19,6 @@ expect "test 3ab"			{ exit 0 }
 exit 1
 EOE
 
-sleep 1
-
 ICB_RUN_NUM=2
 run_oicb user2 roomfoo <<EOE &
 expect "You are now in group roomfoo" { send "/m user2 test 2 to 2\n" }
