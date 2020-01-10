@@ -119,6 +119,10 @@ enum SrvFeature {
 	ExtPkt	= 0x02,
 } srv_features = Ping;
 
+
+void	 usage(const char *msg);
+void	 pledge_me(void);
+
 void	 push_stdout_msg(const char *text);
 size_t	 push_data(int fd, char *data, size_t len);
 void	 proceed_output(struct icb_task_queue *q, int fd);
@@ -130,7 +134,7 @@ void	 push_icb_msg(char type, const char *src, size_t len);
 void	 push_icb_msg_ws(char type, const char *src, size_t len);
 void	 push_icb_msg_extended(char type, const char *src, size_t len);
 char	*get_next_icb_msg(size_t *msglen);
-void	 usage(const char *msg);
+
 void	 update_pollfds(void);
 #ifdef SIGINFO
 void	 siginfo_handler(int sig);
@@ -146,12 +150,13 @@ void	 proceed_cmd_result_end(char *msg, size_t len);
 void	 proceed_user_list(char *msg, size_t len);
 void	 proceed_group_list(char *msg, size_t len);
 
-char	*null_completer(const char *text, int state);
+char	*null_completer(const char *text, int cmpl_state);
 
 struct history_file	*get_history_file(char *path);
 char	*get_save_path_for(char type, const char *who);
 void	 save_history(char type, const char *who, const char *msg);
 void	 proceed_history(void);
+int	 create_dir_for(char *path);
 
 int	priv_cmd_end(const char *line);
 int	priv_nick_start(const char *line);
@@ -185,12 +190,15 @@ struct cmd_result_handler {
 #ifdef SIGINFO
 void
 siginfo_handler(int sig) {
+	(void)sig;
 	want_info = 1;
 }
 #endif
 
 int
 siginfo_cmd(int count, int key) {
+	(void)count;
+	(void)key;
 	want_info = 1;
 	return 0;
 }
@@ -950,7 +958,9 @@ proceed_cmd_result(char *msg, size_t len) {
 
 void
 proceed_cmd_result_end(char *msg, size_t len) {
-	/* ARGSUSED */
+	(void)msg;
+	(void)len;
+
 	if (last_cmd_has_nl)
 		last_cmd_has_nl = 0;
 	else
@@ -961,9 +971,11 @@ proceed_cmd_result_end(char *msg, size_t len) {
 void
 proceed_user_list(char *msg, size_t len) {
 	char		*p, *endptr;
-	const char	*nick, *ident, *srcaddr;
+	const char	*peer_nick, *ident, *srcaddr;
 	int		 nicklen;
 	long long	 signedon, idle;
+
+	(void)len;
 
 /*
 moderator ("m" or else)
@@ -985,16 +997,16 @@ IP address/domain
 		push_stdout_msg("*");
 	else
 		push_stdout_msg(" ");
-	nick = p + 1;
-	p = strchr(nick, '\001');
+	peer_nick = p + 1;
+	p = strchr(peer_nick, '\001');
 	if (p != NULL) {
 		*p = '\0';
-		nicklen = p - nick;
+		nicklen = p - peer_nick;
 	} else {
-		nicklen = strlen(nick);
+		nicklen = strlen(peer_nick);
 	}
 	(void)nicklen;	// TODO
-	push_stdout_msg(nick);
+	push_stdout_msg(peer_nick);
 	if (p == NULL)
 		goto end;
 	p++;
@@ -1036,6 +1048,8 @@ proceed_group_list(char *msg, size_t len) {
 	size_t		 bufsz, namelen, topiclen;
 	char		*buf, *name, *topic, *msgid;
 	const size_t	 min_name_len = 30;
+
+	(void)len;
 
 	name = msg;
 	if ((topic = strchr(name, '\001')) == NULL) {
@@ -1146,7 +1160,7 @@ proceed_icb_msg(char *msg, size_t len) {
 			err_invalid_msg(type, "missing output type");
 		*msg++ = '\0';
 		len -= msg - outtype;
-		for (i = 0; i < sizeof(cmd_handlers)/sizeof(cmd_handlers[0]);
+		for (i = 0; i < (int)(sizeof(cmd_handlers)/sizeof(cmd_handlers[0]));
 		    i++)
 			if (strcmp(outtype, cmd_handlers[i].outtype) == 0) {
 				if (cmd_handlers[i].handler)
@@ -1314,7 +1328,9 @@ get_next_icb_msg(size_t *msglen) {
 }
 
 char *
-null_completer(const char *text, int state) {
+null_completer(const char *text, int cmpl_state) {
+	(void)text;
+	(void)cmpl_state;
 	return NULL;
 }
 
