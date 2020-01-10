@@ -37,6 +37,7 @@ run_oicb() {
 		echo "FAIL"
 		echo "expect log:"
 		cat "${TEST_LOG}.expect"
+		echo
 		return 1
 	}
 }
