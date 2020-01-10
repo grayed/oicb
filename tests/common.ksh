@@ -6,6 +6,7 @@ ICBD_PID=
 ICB_PIDS=
 TEST_LOG="$OICB_DIR/${0##*/}.log"
 TEST_NAME=${0##*/test-}
+FAIL_CNT=0
 
 icbd=$(command -v icbd)
 if [ $? -ne 0 ]; then
@@ -33,7 +34,8 @@ run_oicb() {
 		echo 'set oicb_args [lrange $argv 0 end]'
 		echo "spawn -noecho \"${OICB_DIR}/oicb\" {*}\$oicb_args"
 		cat
-	} | expect -b - -- "${args[@]}" && echo OK; } || {
+	} | expect -b - -- "${args[@]}"; } || {
+		FAIL_CNT=$(($FAIL_CNT + 1))
 		echo "FAIL"
 		echo "expect log:"
 		cat "${TEST_LOG}.expect"
@@ -60,10 +62,11 @@ kill_icbd() {
 	ICBD_PID=
 }
 
-cleanup() {
-	test -n "$ICBD_PID" && kill_icbd
+finish() {
+	test -z "$ICBD_PID" || kill_icbd || true
+	test $FAIL_CNT -lt 0 || echo OK
 }
 
-trap cleanup EXIT
+trap finish EXIT
 
 echo "===> oicb test $TEST_NAME"
