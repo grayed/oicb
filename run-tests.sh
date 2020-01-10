@@ -1,5 +1,11 @@
 #!/bin/sh
 
-for t in $(ls tests/test-* | sort -R); do
-	sh ./"$t"
+if [ $# -gt 0 ]; then
+	tests="$@"
+else
+	tests=$(ls tests/test-* | sed 's,tests/test-,,' | sort -R)
+fi
+
+for t in $tests; do
+	sh "tests/test-${t}"
 done
