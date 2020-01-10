@@ -1,7 +1,15 @@
 
 ====================
-HEAD
+v.1.1.3
 ====================
+
+* Build with -Wall when Clang or GCC is used with CMake.
+  Also, debug builds will now have -Werror enabled by default.
+* Fix build on Linux with -Wall and -Werror both set.
+* Fix start without log directory under unveil().
+  Found by Klemens Nanni and Kenneth R Westerback.
+* If history directory could be open/created, warn but continue.
+* Added test framework. Requires icbd installed.
 
 ====================
 v.1.1.2
