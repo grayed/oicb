@@ -1546,6 +1546,7 @@ main(int argc, char **argv) {
 	rl_bind_key('\t', cycle_priv_chats_forward);
 	rl_bind_keyseq("\\e[Z", cycle_priv_chats_backward);
 	rl_bind_key(CTRL('p'), list_priv_chats_nicks);
+	rl_bind_key(CTRL('t'), siginfo_cmd);
 
 #ifdef SIGINFO
 	if (sigaction(SIGINFO, NULL, &sa) == -1)
