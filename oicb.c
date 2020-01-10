@@ -1573,6 +1573,8 @@ main(int argc, char **argv) {
 
 	while (!want_exit) {
 		if (want_info) {
+			push_stdout_msg(getprogname());
+			push_stdout_msg(": ");
 			push_stdout_msg("sitting in room ");
 			push_stdout_msg(room);
 			push_stdout_msg(" at ");
