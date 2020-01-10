@@ -1,5 +1,5 @@
 #!/bin/sh
 
-for t in tests/test-*; do
+for t in $(ls tests/test-* | sort -R); do
 	sh ./"$t"
 done
