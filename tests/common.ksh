@@ -20,7 +20,7 @@ rm -Rf "${OICB_DIR}/.oicb"
 
 # 1. Inserts @host:port into penultimate argument
 # 2. Runs expect(1) that in turn runs oicb and read script from stdin.
-run_oicb() {
+run_oicb_sync() {
 	local args idx expect_log fail_text
 
 	idx=$(($# - 2))
@@ -39,13 +39,17 @@ run_oicb() {
 		echo "spawn -noecho \"${OICB_DIR}/oicb\" {*}\$oicb_args"
 		cat
 	} | expect -b - -- "${args[@]}"; } || {
-		FAIL_CNT=$(($FAIL_CNT + 1))
 		echo "$fail_text"
 		echo "expect log:"
 		cat "$expect_log"
 		echo
 		return 1
 	}
+}
+
+run_oicb() {
+	run_oicb_sync "$@" &
+	set -A ICB_PIDS -- $ICB_PIDS $!
 }
 
 run_icbd() {
@@ -67,6 +71,11 @@ kill_icbd() {
 }
 
 finish() {
+	for pid in ${ICB_PIDS[@]}; do
+		wait $pid || {
+			FAIL_CNT=$((FAIL_CNT + 1))
+		}
+	done
 	test -z "$ICBD_PID" || kill_icbd || true
 	test $FAIL_CNT -lt 0 || echo OK
 }
