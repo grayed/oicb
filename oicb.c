@@ -229,16 +229,27 @@ prepare_stdout(void) {
 
 void
 restore_rl(void) {
-	size_t	len;
+	size_t	 len;
 
-	len = strlen(o_rl_buf);
-	rl_extend_line_buffer(len+1);
-	(void) strlcpy(rl_line_buffer, o_rl_buf, len+1);
+	if (repeat_priv_nick) {
+		rl_clear_message();
+		rl_point = 0;
+		rl_insert_text("/m ");
+		rl_insert_text(priv_chats_nicks[0]);
+		rl_insert_text(" ");
+		kill(getpid(), SIGWINCH);
+		repeat_priv_nick = 0;
+	} else {
+		len = strlen(o_rl_buf);
+		rl_extend_line_buffer(len+2);
+		(void) strlcpy(rl_line_buffer, o_rl_buf, len+1);
+		rl_point = o_rl_point;
+		rl_mark = o_rl_mark;
+		rl_redisplay();
+	}
+
 	free(o_rl_buf);
 	o_rl_buf = NULL;
-	rl_point = o_rl_point;
-	rl_mark = o_rl_mark;
-	rl_redisplay();
 }
 
 /*
