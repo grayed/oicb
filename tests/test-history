@@ -1,0 +1,51 @@
+#!/bin/ksh
+
+. ${0%/*}/common.ksh
+
+run_icbd
+
+run_oicb user1 roomfoo <<EOE
+set send_human { .1 .2 1 .05 0.5 }
+expect "You are now in group roomfoo\\r\\n"	{ send "/m user1 test 1\\n" }
+expect "] \\*user1\\* test 1\\r\\n"		{ send "\t/m user2 test 2\\n" }
+expect "! No such user user2\\r\\n"		{ send "\\ttest 3\\ntest 4\\n"; exit 0 }
+exit 1
+EOE
+
+logdir=~/.oicb/logs/127.0.0.1
+test -d "${logdir}" || fail "history directory '$logdir' is absent"
+test -f "${logdir}/room-roomfoo.log" || fail "roomfoo room log file is absent"
+test -f "${logdir}/private-user1.log" || fail "user1 private log file is absent"
+test -f "${logdir}/private-user2.log" || fail "user2 private log file is absent"
+
+ts_re='[0-9]{4}-[01][0-9]-[0-3][0-9] [0-2][0-9]:[0-5][0-9]:[0-6][0-9]'
+
+user1_log="${logdir}/private-user1.log"
+user2_log="${logdir}/private-user2.log"
+room_log="${logdir}/room-roomfoo.log"
+
+for f in "$user1_log" "$user2_log" "$room_log"; do
+	! grep -Ev "^${ts_re} " "$f" || fail "invalid lines found in $f"
+done
+
+nfiles=$(ls "$logdir" | wc -l)
+test $nfiles -eq 3 || fail "extra $(($nfiles - 3)) files found in ${logdir}"
+
+sed -E "s/^${ts_re} //" <"$user1_log" >"${user1_log}.stripped" || fail "sed ${user1_log}"
+diff -u -L "user1.log.expected" -L "user1.log.actual" - "${user1_log}.stripped" <<EOF
+me: test 1
+user1: test 1
+EOF
+
+sed -E "s/^${ts_re} //" <"$user2_log" >"${user2_log}.stripped" || fail "sed ${user2_log}"
+diff -u -L "user2.log.expected" -L "user2.log.actual" - "${user2_log}.stripped" <<EOF
+me: test 2
+127.0.0.1: No such user user2
+EOF
+
+sed -E "s/^${ts_re} //" <"$room_log" >"${room_log}.stripped" || fail "sed ${room_log}"
+diff -u -L "room.log.expected" -L "room.log.actual" - "${room_log}.stripped" <<EOF
+Status: You are now in group roomfoo
+me: test 3
+me: test 4
+EOF
