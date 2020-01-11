@@ -4,11 +4,16 @@
 
 run_icbd
 
+# For some reasons this test fails if it ends with send() instead of expect().
+# Either this is an oicb (timing?) bug, or failure of expect(1) - not reading
+# stdout from oicb.
+
 run_oicb user1 roomfoo <<EOE
 set send_human { .1 .2 1 .05 0.5 }
 expect "You are now in group roomfoo\\r\\n"	{ send "/m user1 test 1\\n" }
 expect "] \\*user1\\* test 1\\r\\n"		{ send "\t/m user2 test 2\\n" }
-expect "! No such user user2\\r\\n"		{ send "\\ttest 3\\ntest 4\\n"; exit 0 }
+expect "! No such user user2\\r\\n"		{ send "\\t\\ttest 3\\ntest 4\\n/m user1 test 5\n" }
+expect "] \\*user1\\* test 5\\r\\n"		{ exit 0 }
 exit 1
 EOE
 
@@ -35,6 +40,8 @@ sed -E "s/^${ts_re} //" <"$user1_log" >"${user1_log}.stripped" || fail "sed ${us
 diff -u -L "user1.log.expected" -L "user1.log.actual" - "${user1_log}.stripped" <<EOF
 me: test 1
 user1: test 1
+me: test 5
+user1: test 5
 EOF
 
 sed -E "s/^${ts_re} //" <"$user2_log" >"${user2_log}.stripped" || fail "sed ${user2_log}"
