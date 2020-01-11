@@ -5,10 +5,12 @@
 run_icbd
 
 run_oicb user1 roomfoo <<EOE
-expect "You are now in group roomfoo"	{ send "/m user1 test 1\n" }
-expect "] \\*user1\\* test 1\r\n$"	{ send "/m user1 test 2\n" }
-expect "] \\*user1\\* test 2\r\n$"	{ send "test 3\t" }
-expect "\r/m user1 test 3"		{ send "a\t" }
-expect "\rtest 3a"			{ exit 0 }
+expect "You are now in group roomfoo"		{ send "/m user1 test 1\\n" }
+expect "] \\*user1\\* test 1\\r\\n/m user1 \$"	{ send "test 2\\n" }
+expect "] \\*user1\\* test 2\\r\\n/m user1 \$"	{ send "test 3\\t" }
+expect "\\rtest 3\$"				{ send "a\\t" }
+# send_user "X \$expect_out(0,string) X\\n"
+# send_user "Y \$expect_out(buffer) Y\\n"
+expect "\\r/m user1 test 3a\$"			{ exit 0 }
 exit 1
 EOE

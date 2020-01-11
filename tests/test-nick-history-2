@@ -6,29 +6,34 @@ run_icbd
 
 ICB_RUN_NUM=1
 run_oicb user1 roomfoo <<EOE &
-expect "You are now in group roomfoo" { send "/m user1 test 1 to 1\n" }
+expect "You are now in group roomfoo\\r\\n" { send "/m user1 test 1 to 1\\n\\t" }
 expect {
-	"user2 * entered group"	{ sleep 1; send "ICQ\n" }
-	"> ICQ"
+	"user2 * entered group\\r\\n"	{ sleep 1; send "ICQ\\n" }
+	"] <user2> ICQ\\r\\n"
 }
-send "/m user2 test 1 to 2"
-expect "] \\*user2\\* test 2 to 1"	{ send "test 3\t" }
-expect "/m user2 test 3"		{ send "a\t" }
-expect "/m user1 test 3a"		{ send "b\t" }
-expect "test 3ab"			{ exit 0 }
+send "/m user2 test 1 to 2\\n"
+expect "] \\*user2\\* test 2 to 1\\r\\n"	{ send "test 3\\t" }
+expect "\\r/m user1 test 3"		{ send "a\\t" }
+expect "\\rtest 3a"			{ send "b\\t" }
+expect "\\r/m user2 test 3ab"		{ exit 0 }
 exit 1
 EOE
+icb1=$!
 
 ICB_RUN_NUM=2
 run_oicb user2 roomfoo <<EOE &
-expect "You are now in group roomfoo" { send "/m user2 test 2 to 2\n" }
+expect "You are now in group roomfoo\\r\\n" { send "/m user2 test 2 to 2\\n\\t" }
 expect {
-	"user1 * entered group" { sleep 1; send "ICQ\n" }
-	"> ICQ"
+	"user1 * entered group\\r\\n" { sleep 1; send "ICQ\\n" }
+	"] <user1> ICQ\\r\\n"
 }
-expect "] \\*user1\\* test 1 to 2" {
-	send "/m user1 test 2 to 1\n"
+expect "] \\*user1\\* test 1 to 2\\r\\n" {
+	send "/m user1 test 2 to 1\\n\\t"
 }
-expect "\\[=Sign-off=] user2 (user2@127.0.0.1) just left" { exit 0 }
+expect "] user1 * just left\\r\\n" { exit 0 }
 exit 1
 EOE
+icb2=$!
+
+wait $icb1 || fail "first client failed"
+wait $icb2 || fail "second client failed"

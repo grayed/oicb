@@ -5,11 +5,11 @@ ICBD_PORT=${ICBD_PORT:-8398}
 SUDO=${SUDO:-/usr/bin/doas}
 
 ICBD_PID=
-ICB_PIDS=
+ICB_RUN_NUM=
+set -A ICB_PIDS --
 TEST_LOG="$OICB_DIR/${0##*/}.log"
 TEST_NAME=${0##*/test-}
 FAIL_CNT=0
-ICB_RUN_NUM=
 
 icbd=$(command -v icbd)
 if [ $? -ne 0 ]; then
@@ -22,7 +22,7 @@ rm -Rf "${OICB_DIR}/.oicb"
 
 # 1. Inserts @host:port into penultimate argument
 # 2. Runs expect(1) that in turn runs oicb and read script from stdin.
-run_oicb_sync() {
+run_oicb() {
 	local args idx expect_log fail_text
 
 	idx=$(($# - 2))
@@ -33,14 +33,15 @@ run_oicb_sync() {
 	expect_log="${TEST_LOG}.expect${ICB_RUN_NUM:+-$ICB_RUN_NUM}"
 	fail_text="FAIL${ICB_RUN_NUM:+ $ICB_RUN_NUM}"
 
-	{ {
+	{
 		echo "set timeout 3"
 		echo "log_file -a -noappend \"${expect_log}\""
 		echo "log_user 0"
 		echo 'set oicb_args [lrange $argv 0 end]'
 		echo "spawn -noecho \"${OICB_DIR}/oicb\" {*}\$oicb_args"
 		cat
-	} | expect -b - -- "${args[@]}"; } || {
+	} | expect -b - -- "${args[@]}" || {
+		FAIL_CNT=$((FAIL_CNT + 1))
 		echo "$fail_text"
 		echo "expect log:"
 		cat "$expect_log"
@@ -49,7 +50,7 @@ run_oicb_sync() {
 	}
 }
 
-run_oicb() {
+run_oicb_async() {
 	run_oicb_sync "$@" &
 	set -A ICB_PIDS -- $ICB_PIDS $!
 }
@@ -86,11 +87,12 @@ wait_for_clients() {
 	local failed=0
 
 	for pid in ${ICB_PIDS[@]}; do
+		echo "waiting for client pid $pid" >&2
 		wait $pid || failed=$((failed + 1))
 	done
-	FAIL_CNT=$((FAIL_CNT + $failed))
-	test $failed = 0
 	set -A ICB_PIDS --
+	FAIL_CNT=$(($FAIL_CNT + $failed))
+	test $failed = 0
 }
 
 finish() {
