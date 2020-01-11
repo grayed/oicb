@@ -160,15 +160,29 @@ void	 save_history(char type, const char *who, const char *msg);
 void	 proceed_history(void);
 int	 create_dir_for(char *path);
 
-int	cmd_start(const char *line);
-int	cmd_end(const char *line);
-int	priv_cmd_end(const char *line);
-int	priv_nick_start(const char *line);
-int	priv_nick_end(const char *line);
-int	priv_msg_start(const char *line);
+struct line_cmd {
+	char	*start;	// same as the parse_cmd_line() argument
+	char	*cmd_name;
+	char	*cmd_name_end;
+	int	 cmd_name_len;
+	int	 has_args;
+	int	 is_private;	// "/m" or "/msg"
 
-void	update_nick_history(const char *cmdargs);
+	// only in private message commands
+	int	 private_prefix_len;	// up to private_msg
+	char	*peer_nick;		
+	char	*peer_nick_end;
+	char	*private_msg;
+	int	 peer_nick_offset;	// from start
+	int	 peer_nick_len;
+};
+
+int	parse_cmd_line(char *line, struct line_cmd *cmd);
+
+void	update_nick_history(const char *peer_nick, const char *msg);
 int	list_priv_chats_nicks(int foo, int bar);
+int	match_nick_from_history(const char *prefix, size_t prefixlen,
+	                        int forward);
 int	cycle_priv_chats(int forward);
 
 // readline wrappers
@@ -453,179 +467,183 @@ fail:
 	return NULL;
 }
 
-// Input: command line, starting with /m or /msg.
-// Returns: index where command name starts, or 0 if no command name
+// Input: line input from user
+// Returns: 1 if valid command found, 0 otherwise
+// Note: 'line' is not modified because struct fields being assigned are not.
 int
-cmd_start(const char *line) {
-	const char	*p = line;
+parse_cmd_line(char *line, struct line_cmd *cmd) {
+	char	*p = (char *)line;
 
-	if (*p++ != '/')
+	memset(cmd, 0, sizeof(struct line_cmd));
+	if (*p != '/') {
+		if (debug >= 2)
+			warnx("%s: not a command, line='%s'",
+			   __func__, line);
 		return 0;
-	while (*p != '\0' && isspace(*p))
+	}
+	cmd->start = p++;
+
+	if (!isalpha(*p)) {
+		if (debug >= 2)
+			warnx("%s: not a command name, line='%s'",
+			   __func__, line);
+		return 0;
+	}
+	cmd->cmd_name = p;
+
+	while (isalpha(*p))
 		p++;
-	if (!isalpha(*p))
-		return 0;
-	return (int)(p - line);
-}
+	cmd->cmd_name_end = p;
+	cmd->cmd_name_len = (int)(p - cmd->cmd_name);
 
-// Input: command line, starting with /m or /msg.
-// Returns: index of first char after command name, or 0 if no command name
-int
-cmd_end(const char *line) {
-	size_t		 idx;
+	if (*p)
+		cmd->has_args = 1;
+	else
+		goto end;
 
-	if ((idx = cmd_start(line)) == 0)
-		return 0;
-	while (isalpha(line[idx]))
-		idx++;
-	return idx;
-}
+	if ((cmd->cmd_name_len == 1 && cmd->cmd_name[0] == 'm') ||
+	    (cmd->cmd_name_len == 3 && memcmp(cmd->cmd_name, "msg", 3) == 0)) {
+		cmd->is_private = 1;
 
-// Input: command line, starting with /m or /msg.
-// Returns: index where command name ends, or 0 if not /m or /msg.
-int
-priv_cmd_end(const char *line) {
-	size_t		 idx;
-	const char	*p;
+		while (isspace(*p))
+			p++;
+		if (!*p) {
+			cmd->private_prefix_len = (int)(p - line);
+			goto end;
+		}
+		cmd->peer_nick = p;
+		cmd->peer_nick_offset = (int)(p - line);
 
-	if ((idx = cmd_start(line)) == 0)
-		return 0;
-	p = line + idx;
-	if (*p++ != 'm')
-		return 0;
-	if (p[0] == 's' && p[1] == 'g')
-		p += 2;
-	if (*p != '\0' && !isspace(*p))
-		return 0;
-	return (int)(p - line);
-}
+		while (*p && !isspace(*p))
+			p++;
+		cmd->peer_nick_end = p;
+		cmd->peer_nick_len = (int)(p - cmd->peer_nick);
+		cmd->private_prefix_len = (int)(p - line);
 
-// Input: command line, starting with /m or /msg.
-// Return: index of nickname, or 0 if not /m or /msg, or no nickname.
-int
-priv_nick_start(const char *line) {
-	size_t	idx;
+		if (isspace(*p)) {
+			cmd->private_msg = ++p;
+			cmd->private_prefix_len++;
+		}
+	}
 
-	if ((idx = priv_cmd_end(line)) == 0)
-		return 0;
-	while (isspace(line[idx]))
-		idx++;
-	if (line[idx] == '\0')
-		return 0;
-	return idx;
-}
-
-// Input: command line, starting with /m or /msg.
-// Return: index of first char after nickname, or 0 if not /m or /msg, or no nickname.
-int
-priv_nick_end(const char *line) {
-	size_t	idx;
-
-	if ((idx = priv_nick_start(line)) == 0)
-		return 0;
-	while (line[idx] != '\0' && !isspace(line[idx]))
-		idx++;
-	return idx;
-}
-
-// Input: command line, starting with /m or /msg.
-// Return: index of message text, or 0 if not /m or /msg, or no message.
-int
-priv_msg_start(const char *line) {
-	size_t	idx;
-
-	if ((idx = priv_nick_end(line)) == 0)
-		return 0;
-	if (!isspace(line[idx]))
-		return 0;
-	return idx + 1;
-}
-
-// Input: private message command args, or NULL for public message.
-void
-update_nick_history(const char *cmdargs) {
+end:
 	if (debug >= 2)
-		warnx("%s: cmdargs='%s'", __func__, cmdargs);
-	if (cmdargs != NULL) {
+		warnx("%s: cmd_name='%.*s' nick_name='%.*s' private_msg='%s'",
+		    __func__, cmd->cmd_name_len, cmd->cmd_name,
+		    cmd->peer_nick_len, cmd->peer_nick,
+		    cmd->private_msg ? cmd->private_msg : "(null)");
+	return 1;
+}
+
+// Input: private message nick and text, or NULLs for public message.
+void
+update_nick_history(const char *peer_nick, const char *msg) {
+	if (debug >= 2)
+		warnx("%s: peer_nick='%s' msg='%s'", __func__, peer_nick, msg);
+
+	if (peer_nick != NULL) {
 		size_t	nicklen;
 		int	i;
-		char	tmp[NICKNAME_MAX];
 
-		while (isspace(*cmdargs))
-			cmdargs++;
-		for (i = 0; cmdargs[i] != '\0' && !isspace(cmdargs[i]); i++)
-			;
-		if (i >= NICKNAME_MAX) {
+		nicklen = strlen(peer_nick);
+		if (nicklen >= NICKNAME_MAX) {
 			push_stdout_msg(getprogname());
 			push_stdout_msg(": warning: nickname is too long\n");
 			return;
 		}
-		nicklen = (size_t)i;
 
 		if (priv_chats_cnt > 0 &&
-		    strncmp(priv_chats_nicks[0], cmdargs, nicklen) == 0 &&
-		    priv_chats_nicks[0][nicklen] == '\0')
+		    strcmp(priv_chats_nicks[0], peer_nick) == 0)
 			return;		// already topmost one
 		for (i = 1; i < priv_chats_cnt; i++) {
-			if (strncmp(priv_chats_nicks[i], cmdargs, nicklen) == 0) {
+			if (strcmp(priv_chats_nicks[i], peer_nick) == 0) {
 				if (debug >=2)
 					warnx("%s: found %s", __func__, priv_chats_nicks[i]);
 				// make current nick the newest one
-				memcpy(tmp, priv_chats_nicks[i], NICKNAME_MAX);
 				memmove(priv_chats_nicks[1], priv_chats_nicks[0], i * NICKNAME_MAX);
-				memcpy(priv_chats_nicks[0], tmp, NICKNAME_MAX);
-				return;
+				goto set_top_nick;
 			}
 		}
-
-		if (debug >= 2)
-			warnx("%s: copying first %d bytes from '%s' to %p",
-			    __func__, (int)nicklen, cmdargs, priv_chats_nicks[0]);
 
 		// add nick to history, possibly kicking out oldest one
 		memmove(priv_chats_nicks[1], priv_chats_nicks[0],
 		    (PRIV_CHATS_MAX - 1) * NICKNAME_MAX);
-		memcpy(priv_chats_nicks[0], cmdargs, nicklen);
-		memset(priv_chats_nicks[0] + nicklen, 0, NICKNAME_MAX - nicklen);
 		if (priv_chats_cnt < PRIV_CHATS_MAX - 1)
 			priv_chats_cnt++;
+
+set_top_nick:
+		if (debug >= 2)
+			warnx("%s: copying '%s' [%zu] to %p",
+			    __func__, peer_nick, nicklen, priv_chats_nicks[0]);
+		memcpy(priv_chats_nicks[0], peer_nick, nicklen);
+		memset(priv_chats_nicks[0] + nicklen, 0, NICKNAME_MAX - nicklen);
 	}
 }
 
+int
+match_nick_from_history(const char *prefix, size_t prefixlen, int forward) {
+	int	i;
+
+	if (forward) {
+		for (i = 0; i < priv_chats_cnt; i++)
+			if (!strncmp(prefix, priv_chats_nicks[i], prefixlen))
+				return i;
+	} else {
+		for (i = priv_chats_cnt - 1; i >= 0; i--)
+			if (!strncmp(prefix, priv_chats_nicks[i], prefixlen))
+				return i;
+	}
+	return forward ? 0 :  priv_chats_cnt - 1;
+}
+
 //
-// The logic as follows:
+// The logic as follows:     [a] forward == 1; [b] forward == 0
 //
-//  1. If private chat nicknames history is empty, just beep.
+//  1.  If private chat nicknames history is empty, just beep.
 //
-//  2. If this is a public chat message, switch to last used private chat.
+//  2a. If this is a public chat message, switch to last used private chat.
+//  2b. If this is a public chat message, switch to last used private chat.
 //
-//  3. If this is not either public or private chat line, just beep.
+//  3.  If this is not either public or private chat line, just beep.
 //
-//  4. If this is a private chat command without nickname, switch to last
+//  4a. If this is a private chat command without nickname, switch to last
+//      used private chat.
+//  4b. If this is a private chat command without nickname, switch to least
 //      used private chat.
 //
-//  5. If the private chat nickname is the oldest used in nick history,
-//     clear private command, making the message public.
+//  5a. If the private chat nickname is the oldest used in nick history,
+//      clear private command, making the message public.
+//  5b. If the private chat nickname is the newest used in nick history,
+//      clear private command, making the message public.
 //
-//  6. If private chat nickname is not remembered, but there is remembered
-//     nickname which starts like this, fill the latter nickname fully.
+//  6.  If private chat nickname is not remembered, but there is remembered
+//      nickname which starts like this, fill the latter nickname fully
+//      (matching first/last nickname from history depending on forward == 1/0)
 //
-//  7. If there is no matching private chat nickname in history, switch to the
-//     last used private chat.
+//  7a. If there is no matching private chat nickname in history, switch to the
+//      last used private chat.
+//  7b. If there is no matching private chat nickname in history, switch to the
+//      least used private chat.
 //
-//  8. Now this is a non-oldest remembered private chat nickname: replace
-//     nickname in private commmand with older one.
+//  8a. Now this is a non-oldest remembered private chat nickname: replace
+//      nickname in private commmand with older one.
+//  8b. Now this is a non-oldest remembered private chat nickname: replace
+//      nickname in private commmand with newer one.
 //
 int
 cycle_priv_chats(int forward) {
-	size_t		nicklen;	// length of entered nickname
+	struct line_cmd cmd;
 	int		i;
 	int		newidx;		// index from history to use
 	int		oldcurpos;	// initial rl_point value
-	int		nickpos;	// offset of nick in entered line
-	const char	*buf;		// because rl_line_buffer name is too long
 
-	if (debug >= 2)
+	enum {
+		BEFORE_NICK,
+		INSIDE_NICK,
+		AFTER_NICK
+	} cursor_zone = AFTER_NICK;
+
+	if (debug >= 3)
 		warnx("%s: forward=%d\n", __func__, forward);
 
 	if (priv_chats_cnt == 0) {
@@ -635,47 +653,38 @@ cycle_priv_chats(int forward) {
 	}
 
 	oldcurpos = rl_point;
-	buf = rl_line_buffer;
-	// Rememeber that after calling rl_*_text() the value of
-	// rl_line_buffer may change.
 
-	if (buf[0] == '/') {
-		int	pce;
-
+	if (parse_cmd_line(rl_line_buffer, &cmd)) {
 		// (3), (4), (5), (6), (7) or (8)
-		if (debug >= 2)
-			warnx("%s: 3-4-5-6-7-8 buf='%s'", __func__, buf);
+		if (debug >= 3)
+			warnx("%s: 3-4-5-6-7-8", __func__);
 
-		pce = priv_cmd_end(buf);
-		if (!pce) {
+		if (!cmd.is_private) {
 			// (3)
 			putchar('\007');
 			return 0;
 		}
-		prefer_long_priv_cmd = buf[pce-1] == 'g';
+		prefer_long_priv_cmd = cmd.cmd_name_len == 3;
 
-		nickpos = priv_nick_start(buf);
-		if (nickpos > 0) {
-			const char	*priv_nick = buf + nickpos;
+		if (cmd.peer_nick_offset) {
+			if (rl_point <= cmd.peer_nick_offset)
+				cursor_zone = BEFORE_NICK;
+			else if (rl_point < cmd.peer_nick_offset + cmd.peer_nick_len)
+				cursor_zone = INSIDE_NICK;
+		}
 
+		if (cmd.peer_nick) {
 			// (5), (6), (7) or (8)
-			if (debug >= 2)
-				warnx("%s: 5-6-7-8 nickpos=%d", __func__, nickpos);
 
-			for (i = 0; priv_nick[i] != '\0' && !isspace(priv_nick[i]); i++)
-				;
-			nicklen = (size_t)i;
 			for (i = 0; i < priv_chats_cnt; i++)
-				if (nicklen == strlen(priv_chats_nicks[i]) &&
-				   memcmp(priv_nick, priv_chats_nicks[i], nicklen) == 0)
+				if (strlen(priv_chats_nicks[i]) == (size_t)cmd.peer_nick_len &&
+				   memcmp(cmd.peer_nick, priv_chats_nicks[i], (size_t)cmd.peer_nick_len) == 0)
 					break;
 			if (( forward && i == priv_chats_cnt - 1) ||
 			    (!forward && i == 0)) {
 				// (5)
-				// "+ 1" for space after nick; if there is none,
-				// readline will handle it fine.
-				rl_delete_text(0, nickpos + (int)nicklen + 1);
-				rl_point -= nickpos + (int)nicklen + 1;
+				rl_delete_text(0, cmd.private_prefix_len);
+				rl_point -= cmd.private_prefix_len;
 				if (rl_point < 0)
 					rl_point = 0;
 				return 0;
@@ -683,24 +692,8 @@ cycle_priv_chats(int forward) {
 
 			if (i == priv_chats_cnt) {
 				// (6) or (7): do prefix matching check
-				if (forward) {
-					for (i = 0; i < priv_chats_cnt; i++)
-						if (strncmp(priv_nick, priv_chats_nicks[i], nicklen) == 0) {
-							// (6)
-							newidx = i;
-							goto replace_nick;
-						}
-				} else {
-					for (i = priv_chats_cnt - 1; i >= 0; i--)
-						if (strncmp(priv_nick, priv_chats_nicks[i], nicklen) == 0) {
-							// (6)
-							newidx = i;
-							goto replace_nick;
-						}
-				}
-
-				// (7)
-				newidx = forward ? 0 :  priv_chats_cnt - 1;
+				newidx = match_nick_from_history(cmd.peer_nick,
+				    (size_t)cmd.peer_nick_len, forward);
 				goto replace_nick;
 			}
 
@@ -710,46 +703,61 @@ cycle_priv_chats(int forward) {
 		}
 
 		// (4)
-		nicklen = 0;
-		newidx = 0;
+		newidx = forward ? 0 : priv_chats_cnt - 1;
 	} else {
 		// (2)
 		rl_point = 0;
 		if (prefer_long_priv_cmd) {
 			rl_insert_text("/msg ");
-			nickpos = 5;
+			cmd.peer_nick_offset = 5;
+			cmd.private_prefix_len = 5;
 		} else {
 			rl_insert_text("/m ");
-			nickpos = 3;
+			cmd.peer_nick_offset = 3;
+			cmd.private_prefix_len = 3;
 		}
-		nicklen = 0;
+		oldcurpos += cmd.peer_nick_offset + 1;
 		newidx = forward ? 0 : priv_chats_cnt - 1;
-		oldcurpos += nickpos + 1;	// "+ 1" for space
 	}
 
 	// (2), (4), (6), (7) or (8)
 
 replace_nick:
+	// cmd fields used:
+	//   peer_nick_offset
+	//   peer_nick_len
+	//   private_prefix_len
+
 	if (debug >= 2) {
-		warnx("%s: replace_nick rl_line_buffer='%s' rl_point=%d oldcurpos=%d nickpos=%d nicklen=%zu",
-		    __func__, rl_line_buffer, rl_point, oldcurpos, nickpos, nicklen);
+		warnx("%s: replace_nick: rl_line_buffer='%s' rl_point=%d oldcurpos=%d newidx=%d",
+		    __func__, rl_line_buffer, rl_point, oldcurpos, newidx);
+		warnx("%s: replace_nick: peer_nick_offset=%d peer_nick_len=%d cursor_zone=%d",
+		    __func__, cmd.peer_nick_offset, cmd.peer_nick_len, cursor_zone);
 	}
 
-	if (nicklen)
-		rl_delete_text(nickpos, nickpos + (int)nicklen + 1);
-	rl_point = nickpos;
+	if (cmd.peer_nick_len)
+		rl_delete_text(cmd.peer_nick_offset, cmd.private_prefix_len);
+	rl_point = cmd.peer_nick_offset;
 	rl_insert_text(priv_chats_nicks[newidx]);
 	rl_insert_text(" ");
 
 	// restoring cursor position
-	if (oldcurpos < nickpos)
+	switch (cursor_zone) {
+	case BEFORE_NICK:
 		rl_point = oldcurpos;
-	else if (oldcurpos > nickpos + (int)nicklen)
+		break;
+
+	case INSIDE_NICK:
+		// play safe
+		rl_point = cmd.peer_nick_offset + cmd.peer_nick_len + 1;
+		break;
+
+	case AFTER_NICK:
 		rl_point = oldcurpos
 		    + (int)strlen(priv_chats_nicks[newidx])
-		    - (int)nicklen;
-	else // cursors was inside nickname, play safe
-		rl_point = nickpos + nicklen;
+		    - cmd.peer_nick_len;
+		break;
+	}
 	return 0;
 }
 
@@ -935,46 +943,43 @@ proceed_output(struct icb_task_queue *q, int fd) {
  */
 void
 proceed_user_input(char *line) {
-	char	*p;
-	size_t	 n;
+	struct line_cmd	 cmd;
+	const char	*p;
 
 	if (line == NULL) {
 		want_exit = 1;
 		return;
 	}
+
 	for (p = line; isspace(*p); p++)
 		;
 	if (!*p)
-		// add some insult like icb(1) does?
-		return;
-	if (line[0] == '/' && line[1] && !isspace(line[1])) {
-		int	c_end, pc_end, nick_start, pms;
+		return;    // add some insult like icb(1) does?
 
-		c_end = cmd_end(line);
-		pc_end = priv_cmd_end(line);
-		nick_start = priv_nick_start(line);
-		pms = priv_msg_start(line);
-		if (debug >= 2)
-			warnx("%s: c_end=%d pc_end=%d nick_start=%d pms=%d line='%s'",
-			    __func__, c_end, pc_end, nick_start, pms, line);
+	if (parse_cmd_line(line, &cmd)) {
+		if (cmd.has_args)
+			*cmd.cmd_name_end = '\001';    // separate args
 
-		if (line[c_end])
-			line[c_end] = '\001';    // separate args
+		if (cmd.is_private) {
+			char	ch;
 
-		if (pc_end > 0) {
-			if (pms == 0)
+			if (!cmd.private_msg)
 				return;    // skip empty line
-			update_nick_history(&line[nick_start]);
-			save_history('c', "me", &line[pms]);
+			ch = *cmd.peer_nick_end;
+			*cmd.peer_nick_end = '\0';
+			update_nick_history(cmd.peer_nick, cmd.private_msg);
+			save_history('c', cmd.peer_nick, cmd.private_msg);
+			*cmd.peer_nick_end = ch;
 			repeat_priv_nick = 1;
-			prefer_long_priv_cmd = line[pc_end-1] == 'g';
+			prefer_long_priv_cmd = cmd.cmd_name_len == 3;
 		}
 		push_icb_msg('h', line + 1, strlen(line) - 1);
 		state = CommandSent;
 		return;
 	}
+
 	// public message
-	update_nick_history(NULL);
+	update_nick_history(NULL, NULL);
 	save_history('b', "me", line);
 	push_icb_msg('b', line, strlen(line));
 }
