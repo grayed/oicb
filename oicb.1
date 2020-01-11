@@ -32,7 +32,11 @@ is a minimalistic command-line ICB client.
 The options are as follows:
 .Bl -tag -width Ds
 .It Fl d
-Debug mode.
+Debug mode: enables printing some internal state information.
+If this flag is specified more than once, more stuff will be printed.
+Also, the
+.Ic Ctrl+X
+key combination is reserved in debug mode for developer needs.
 .It Fl H
 Disable local chat history saving (see below).
 .It Fl t Ar secs

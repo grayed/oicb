@@ -122,6 +122,7 @@ enum SrvFeature {
 
 void	 usage(const char *msg);
 void	 pledge_me(void);
+int	 test_cmd(int count, int key);
 
 void	 push_stdout_msg(const char *text);
 size_t	 push_data(int fd, char *data, size_t len);
@@ -1619,6 +1620,8 @@ main(int argc, char **argv) {
 	rl_bind_keyseq("\\e[Z", cycle_priv_chats_backward);
 	rl_bind_key(CTRL('p'), list_priv_chats_nicks);
 	rl_bind_key(CTRL('t'), siginfo_cmd);
+	if (debug)
+		rl_bind_key(CTRL('x'), test_cmd);
 
 #ifdef SIGINFO
 	if (sigaction(SIGINFO, NULL, &sa) == -1)
@@ -1658,6 +1661,15 @@ main(int argc, char **argv) {
 			push_stdout_msg(" as ");
 			push_stdout_msg(nick);
 			push_stdout_msg("\n");
+
+			if (debug) {
+				char	ibuf[1000];
+
+				snprintf(ibuf, sizeof(ibuf), "%s: rl_line_buffer=0x%p '%s' [%zu] rl_point=%d rl_mark=%d\n",
+				    getprogname(), rl_line_buffer, rl_line_buffer, strlen(rl_line_buffer), rl_point, rl_mark);
+				push_stdout_msg(ibuf);
+			}
+
 			want_info = 0;
 		}
 
@@ -1708,5 +1720,12 @@ main(int argc, char **argv) {
 		restore_rl();
 		proceed_history();
 	}
+	return 0;
+}
+
+int
+test_cmd(int count, int key) {
+	(void)count;
+	(void)key;
 	return 0;
 }
