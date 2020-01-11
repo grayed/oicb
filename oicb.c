@@ -215,10 +215,10 @@ prepare_stdout(void) {
 	char	*p;
 
 	if (o_rl_buf != NULL)
-		err(1, "internal error: already called prepare_stdout");
+		errx(1, "%s: already called (internal error)", __func__);
 	o_rl_buf = strdup(rl_line_buffer);
 	if (o_rl_buf == NULL)
-		err(1, "prepare_stdout");
+		err(1, __func__);
 	o_rl_point = rl_point;
 	o_rl_mark = rl_mark;
 	for (p = rl_line_buffer; *p; p++)
@@ -270,7 +270,7 @@ push_stdout_msg(const char *text) {
 	len = strlen(text) + 1;
 	it = calloc(1, sizeof(struct icb_task) + len);
 	if (it == NULL)
-		err(1, "push_stdout_msg");
+		err(1, __func__);
 	it->it_len = len;
 	memcpy(it->it_data, text, len);
 	SIMPLEQ_INSERT_TAIL(&tasks_stdout, it, it_entry);
@@ -282,8 +282,8 @@ push_stdout_msg(const char *text) {
 void
 push_icb_msg(char type, const char *src, size_t len) {
 	if (debug >= 2) {
-		warnx("asked to push message of type '%c' with size %zu: "
-		    "%s, queue %p", type, len, src, &tasks_net);
+		warnx("%s: asked type '%c' with size %zu: %s, queue %p",
+		    __func__, type, len, src, &tasks_net);
 	}
 	if ((srv_features & ExtPkt) == ExtPkt)
 		push_icb_msg_extended(type, src, len);
@@ -326,7 +326,7 @@ push_icb_msg_ws(char type, const char *msg, size_t len) {
 		} else
 			msglen = len;
 		if ((it = calloc(1, sizeof(struct icb_task) + msglen + commonlen + 3)) == NULL)
-			err(1, "push_icb_msg_ws");
+			err(1, __func__);
 		it->it_len = msglen + commonlen + 3;
 		it->it_data[0] = (char)((unsigned char)msglen + commonlen + 2);
 		it->it_data[1] = type;
@@ -349,13 +349,12 @@ push_icb_msg_extended(char type, const char *src, size_t len) {
 
 	len++;    // for trailing NUL
 	msgcnt = (len + 253) / 254;
-	if (debug >= 3) {
-		warnx("there will be %zu messages", msgcnt);
-	}
+	if (debug >= 3)
+		warnx("%s: there will be %zu messages", __func__, msgcnt);
 
 	// +1 for sizeof(struct icb_task)
 	if ((it = calloc(msgcnt + 1, 256)) == NULL)
-		err(1, "push_icb_msg_extended");
+		err(1, __func__);
 	it->it_len = len + msgcnt * 2;   // for size and type bytes in each message
 	dst = (unsigned char *)it->it_data;
 	while (msgcnt-- > 1) {
@@ -438,10 +437,10 @@ get_history_file(char *path) {
 
 	hf = calloc(1, sizeof(struct history_file));
 	if (hf == NULL)
-		goto err;
+		goto fail;
 	hf->hf_path = strdup(path);
 	if (create_dir_for(hf->hf_path) == -1)
-		goto err;
+		goto fail;
 	hf->hf_fd = -1;    /* to be opened later */
 	SIMPLEQ_INIT(&hf->hf_tasks);
 	LIST_INSERT_HEAD(&history_files, hf, hf_entry);
@@ -449,7 +448,7 @@ get_history_file(char *path) {
 found:
 	return hf;
 
-err:
+fail:
 	free(hf);
 	return NULL;
 }
@@ -580,7 +579,8 @@ update_nick_history(const char *cmdargs) {
 		}
 
 		if (debug >= 2)
-			warnx("%s: copying first %d bytes from '%s' to %p", __func__, (int)nicklen, cmdargs, priv_chats_nicks[0]);
+			warnx("%s: copying first %d bytes from '%s' to %p",
+			    __func__, (int)nicklen, cmdargs, priv_chats_nicks[0]);
 
 		// add nick to history, possibly kicking out oldest one
 		memmove(priv_chats_nicks[1], priv_chats_nicks[0],
@@ -810,15 +810,15 @@ save_history(char type, const char *who, const char *msg) {
 	now = localtime(&t);
 	path = get_save_path_for(type, who);
 	if (path == NULL)
-		goto err;
+		goto fail;
 	hf = get_history_file(path);
 	if (hf == NULL)
-		goto err;
+		goto fail;
 
 	datasz = datelen + strlen(who) + 2 + strlen(msg) + 1;
 	it = calloc(1, sizeof(struct icb_task) + datasz);
 	if (it == NULL)
-		goto err;
+		goto fail;
 	strftime(it->it_data, datasz, "%Y-%m-%d %H:%M:%S ", now);
 	strlcat(it->it_data, who, datasz);
 	strlcat(it->it_data, ": ", datasz);
@@ -828,8 +828,8 @@ save_history(char type, const char *who, const char *msg) {
 	SIMPLEQ_INSERT_TAIL(&hf->hf_tasks, it, it_entry);
 	return;
 
-err:
-	warn("save_history");
+fail:
+	warn(__func__);
 	free(path);
 }
 
@@ -847,7 +847,7 @@ proceed_history(void) {
 			hf->hf_fd = open(hf->hf_path,
 			     O_WRONLY|O_CREAT|O_APPEND|O_NONBLOCK, 0666);
 			if (hf->hf_fd == -1) {
-				warnx("can't open %s", hf->hf_path);
+				warnx("cannot open %s", hf->hf_path);
 				while (!SIMPLEQ_EMPTY(&hf->hf_tasks)) {
 					it = SIMPLEQ_FIRST(&hf->hf_tasks);
 					SIMPLEQ_REMOVE_HEAD(&hf->hf_tasks, it_entry);
@@ -860,12 +860,14 @@ proceed_history(void) {
 		while (!SIMPLEQ_EMPTY(&hf->hf_tasks)) {
 			it = SIMPLEQ_FIRST(&hf->hf_tasks);
 			do {
-				nwritten = write(hf->hf_fd, it->it_data + it->it_ndone,
+				nwritten = write(hf->hf_fd,
+				    it->it_data + it->it_ndone,
 				    it->it_len - it->it_ndone);
 				if (nwritten == -1) {
 					if (errno == EAGAIN)
 						goto next_file;
-					warn("can't write history to %s", hf->hf_path);
+					warn("cannit write history to %s",
+					    hf->hf_path);
 					close(hf->hf_fd);
 					hf->hf_fd = -1;
 					goto next_file;
@@ -899,7 +901,7 @@ push_data(int fd, char *data, size_t len) {
 	}
 	if (nwritten != -1 || errno == EAGAIN)
 		return total;
-	err(2, "write");
+	err(2, __func__);
 }
 
 /*
@@ -1026,7 +1028,7 @@ proceed_chat_msg(char type, const char *author, const char *text) {
 	    strlen(postuser) + strlen(text)*4;
 
 	if ((buf = malloc(szbuf)) == NULL)
-		err(1, "proceed_chat_msg");
+		err(1, __func__);
 
 	t = time(NULL);
 	strftime(buf, szbuf, "[%H:%M:%S]", localtime(&t));
@@ -1035,7 +1037,7 @@ proceed_chat_msg(char type, const char *author, const char *text) {
 	curlen = strlcat(buf, postuser, szbuf);
 	strvis(buf + curlen, text, VIS_SAFE|VIS_NOSLASH);
 	if (strlcat(buf, "\n", szbuf) >= szbuf)
-		errx(1, "proceed_chat_msg: internal error");
+		errx(1, "%s: internal error", __func__);
 	push_stdout_msg(buf);
 	free(buf);
 }
@@ -1047,7 +1049,7 @@ proceed_cmd_result(char *msg, size_t len) {
 
 	bufsz = len * 4 + 1;
 	if ((buf = malloc(bufsz)) == NULL)
-		err(1, "proceed_cmd_result");
+		err(1, __func__);
 	strvisx(buf, msg, len, VIS_SAFE|VIS_NOSLASH);
 	last_cmd_has_nl = (msg[len-1] == '\n');
 	push_stdout_msg(buf);
@@ -1165,7 +1167,7 @@ proceed_group_list(char *msg, size_t len) {
 		bufsz = min_name_len;
 	bufsz += 3;    // for marker, NUL and delimiter (space or \n)
 	if ((buf = malloc(bufsz)) == NULL)
-		err(1, "proceed_group_list");
+		err(1, __func__);
 	if (strcmp(name, room) == 0)
 		buf[0] = '*';
 	else
@@ -1230,10 +1232,9 @@ proceed_icb_msg(char *msg, size_t len) {
 			/* server doesn't support ping-pong */
 			srv_features &= (~Ping);
 			/* XXX set socket timeout options? */
-			if (debug) {
+			if (debug)
 				warnx("server doesn't support ping-pong,"
 				    " switching to no-op messages");
-			}
 			break;
 		}
 		proceed_chat_msg(type, hostname, msg);
@@ -1289,7 +1290,7 @@ cmd_handler_found:
 		if (strcmp(msg, "1") != 0)
 			err(2, "unsupported protocol version");
 		if (asprintf(&p, "%1$s\001%1$s\001%2$s\001login\001", nick, room) == -1)
-			err(1, "proceed_icb_message");
+			err(1, __func__);
 		push_icb_msg('a', p, strlen(p));
 		free(p);
 		state = LoginSent;
@@ -1352,7 +1353,7 @@ get_next_icb_msg(size_t *msglen) {
 
 	if (buf == NULL) {
 		if ((buf = malloc(bufsize)) == NULL)
-			err(1, "get_next_icb_msg");
+			err(1, "%s: malloc", __func__);
 
 	} else if (msgend) {
 		// resetting state
@@ -1368,14 +1369,14 @@ get_next_icb_msg(size_t *msglen) {
 			if (bufsize >= 1024*1024)
 				err(2, "too long message");
 			if ((nbuf = reallocarray(buf, 2, bufsize)) == NULL)
-				err(1, "get_next_icb_msg");
+				err(1, "%s: reallocarray", __func__);
 			buf = nbuf;
 			bufsize *= 2;
 		}
 		nread = read(sock, buf + bufread, bufsize - bufread - 1);
 		if (nread < 0) {
 			if (errno != EAGAIN)
-				err(1, "get_next_icb_msg");
+				err(1, "%s: read", __func__);
 			break;
 		} else if (nread == 0) {
 			push_stdout_msg("Server ");
@@ -1453,7 +1454,7 @@ update_pollfds(void) {
 	if (npfd < newnpfd) {
 		pfd = reallocarray(pfd, newnpfd, sizeof(struct pollfd));
 		if (pfd == NULL)
-			err(1, "update_pollfds");
+			err(1, __func__);
 		npfd = newnpfd;
 	}
 
@@ -1492,11 +1493,12 @@ icb_connect(const char *addr, const char *port) {
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	if ((ec = getaddrinfo(addr, port, &hints, &res)) != 0)
-		errx(1, "could not resolve host/port name: %s", gai_strerror(ec));
+		errx(1, "could not resolve host/port name: %s",
+		    gai_strerror(ec));
 	for (p = res; p != NULL; p = p->ai_next) {
 		if ((sock = socket(p->ai_family, p->ai_socktype|SOCK_NONBLOCK,
 		    p->ai_protocol)) == -1) {
-			warn("could not create socket");
+			warn("%s: socket", __func__);
 			continue;
 		}
 		if (connect(sock, (struct sockaddr *)p->ai_addr,
@@ -1531,10 +1533,10 @@ pledge_me() {
 
 	if (enable_history) {
 		if (unveil(history_path, "rwc") == -1)
-			err(1, "unveil");
+			err(1, "history unveil");
 	}
 	if (unveil(NULL, NULL) == -1)
-		err(1, "unveil");
+		err(1, "final unveil");
 #endif
 
 #ifdef HAVE_PLEDGE
@@ -1578,7 +1580,7 @@ main(int argc, char **argv) {
 			net_timeout = strtonum(optarg, 0, INT_MAX/1000,
 			    &errstr);
 			if (errstr)
-				err(1, "network timeout specified is %s",
+				errx(1, "invalid network timeout: %s",
 				    errstr);
 			break;
 		default:
@@ -1650,10 +1652,12 @@ main(int argc, char **argv) {
 
 #ifdef SIGINFO
 	if (sigaction(SIGINFO, NULL, &sa) == -1)
-		err(1, "sigaction(SIGINFO, NULL)");
-	sa.sa_handler = siginfo_handler;
-	if (sigaction(SIGINFO, &sa, NULL) == -1)
-		err(1, "sigaction(SIGINFO, &sa)");
+		warn("sigaction(SIGINFO, NULL)");
+	else {
+		sa.sa_handler = siginfo_handler;
+		if (sigaction(SIGINFO, &sa, NULL) == -1)
+			warn("sigaction(SIGINFO, &sa)");
+	}
 #endif
 
 	if (enable_history) {
