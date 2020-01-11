@@ -155,8 +155,9 @@ void	 proceed_group_list(char *msg, size_t len);
 char	*null_completer(const char *text, int cmpl_state);
 
 struct history_file	*get_history_file(char *path);
-char	*get_save_path_for(char type, const char *who);
-void	 save_history(char type, const char *who, const char *msg);
+char	*get_save_path_for(char type, const char *peer);
+void	 save_history(char type, const char *peer, const char *msg,
+	              int incoming);
 void	 proceed_history(void);
 int	 create_dir_for(char *path);
 
@@ -422,19 +423,19 @@ create_dir_for(char *path) {
 }
 
 char*
-get_save_path_for(char type, const char *who) {
+get_save_path_for(char type, const char *peer) {
 	int		 rv;
 	const char	*prefix;
 	char		*path;
 
 	if (type != 'c') {
-		who = room;
+		peer = room;
 		prefix = "room-";
 	} else {
 		prefix = "private-";
 	}
 
-	rv = asprintf(&path, "%s/%s%s.log", history_path, prefix, who);
+	rv = asprintf(&path, "%s/%s%s.log", history_path, prefix, peer);
 	if (rv == -1)
 		return NULL;
 	return path;
@@ -802,7 +803,7 @@ list_priv_chats_nicks(int foo, int bar) {
 }
 
 void	
-save_history(char type, const char *who, const char *msg) {
+save_history(char type, const char *peer, const char *msg, int incoming) {
 	struct history_file	*hf;
 	struct icb_task		*it = NULL;
 	struct tm		*now;
@@ -816,19 +817,21 @@ save_history(char type, const char *who, const char *msg) {
 
 	t = time(NULL);
 	now = localtime(&t);
-	path = get_save_path_for(type, who);
+	path = get_save_path_for(type, peer);
 	if (path == NULL)
 		goto fail;
 	hf = get_history_file(path);
 	if (hf == NULL)
 		goto fail;
 
-	datasz = datelen + strlen(who) + 2 + strlen(msg) + 1;
+	if (!incoming)
+		peer = "me";
+	datasz = datelen + strlen(peer) + 2 + strlen(msg) + 1;
 	it = calloc(1, sizeof(struct icb_task) + datasz);
 	if (it == NULL)
 		goto fail;
 	strftime(it->it_data, datasz, "%Y-%m-%d %H:%M:%S ", now);
-	strlcat(it->it_data, who, datasz);
+	strlcat(it->it_data, peer, datasz);
 	strlcat(it->it_data, ": ", datasz);
 	strlcat(it->it_data, msg, datasz);
 	it->it_len = datasz;
@@ -968,7 +971,7 @@ proceed_user_input(char *line) {
 			ch = *cmd.peer_nick_end;
 			*cmd.peer_nick_end = '\0';
 			update_nick_history(cmd.peer_nick, cmd.private_msg);
-			save_history('c', cmd.peer_nick, cmd.private_msg);
+			save_history('c', cmd.peer_nick, cmd.private_msg, 0);
 			*cmd.peer_nick_end = ch;
 			repeat_priv_nick = 1;
 			prefer_long_priv_cmd = cmd.cmd_name_len == 3;
@@ -980,7 +983,7 @@ proceed_user_input(char *line) {
 
 	// public message
 	update_nick_history(NULL, NULL);
-	save_history('b', "me", line);
+	save_history('b', nick, line, 0);
 	push_icb_msg('b', line, strlen(line));
 }
 
@@ -1004,7 +1007,7 @@ proceed_chat_msg(char type, const char *author, const char *text) {
 	const char	*preuser, *postuser;
 	time_t		 t;
 
-	save_history(type, author, text);
+	save_history(type, author, text, 1);
 
 	switch (type) {
 	case 'c':
