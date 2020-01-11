@@ -113,6 +113,7 @@ char		 history_path[PATH_MAX];
 char		 priv_chats_nicks[PRIV_CHATS_MAX][NICKNAME_MAX];
 int		 priv_chats_cnt;
 int		 repeat_priv_nick;
+int		 prefer_long_priv_cmd;
 
 enum SrvFeature {
 	Ping	= 0x01,
@@ -234,7 +235,10 @@ restore_rl(void) {
 	if (repeat_priv_nick) {
 		rl_clear_message();
 		rl_point = 0;
-		rl_insert_text("/m ");
+		if (prefer_long_priv_cmd)
+			rl_insert_text("/msg ");
+		else
+			rl_insert_text("/m ");
 		rl_insert_text(priv_chats_nicks[0]);
 		rl_insert_text(" ");
 		kill(getpid(), SIGWINCH);
@@ -636,15 +640,19 @@ cycle_priv_chats(int forward) {
 	// rl_line_buffer may change.
 
 	if (buf[0] == '/') {
+		int	pce;
+
 		// (3), (4), (5), (6), (7) or (8)
 		if (debug >= 2)
 			warnx("%s: 3-4-5-6-7-8 buf='%s'", __func__, buf);
 
-		if (!priv_cmd_end(buf)) {
+		pce = priv_cmd_end(buf);
+		if (!pce) {
 			// (3)
 			putchar('\007');
 			return 0;
 		}
+		prefer_long_priv_cmd = buf[pce-1] == 'g';
 
 		nickpos = priv_nick_start(buf);
 		if (nickpos > 0) {
@@ -707,8 +715,13 @@ cycle_priv_chats(int forward) {
 	} else {
 		// (2)
 		rl_point = 0;
-		rl_insert_text("/m ");
-		nickpos = 3;
+		if (prefer_long_priv_cmd) {
+			rl_insert_text("/msg ");
+			nickpos = 5;
+		} else {
+			rl_insert_text("/m ");
+			nickpos = 3;
+		}
 		nicklen = 0;
 		newidx = forward ? 0 : priv_chats_cnt - 1;
 		oldcurpos += nickpos + 1;	// "+ 1" for space
@@ -952,6 +965,7 @@ proceed_user_input(char *line) {
 			update_nick_history(&line[nick_start]);
 			save_history('c', "me", &line[pms]);
 			repeat_priv_nick = 1;
+			prefer_long_priv_cmd = line[pc_end-1] == 'g';
 		}
 		push_icb_msg('h', line + 1, strlen(line) - 1);
 		state = CommandSent;
