@@ -102,5 +102,6 @@ finish() {
 }
 
 trap finish EXIT
+trap "fail 'non-zero exit code'" ERR
 
 echo "===> oicb test $TEST_NAME"
