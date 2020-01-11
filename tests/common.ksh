@@ -1,3 +1,5 @@
+set -e
+
 OICB_DIR="${OICB_DIR:-$PWD/obj}"
 ICBD_PORT=${ICBD_PORT:-8398}
 SUDO=${SUDO:-/usr/bin/doas}
@@ -64,20 +66,37 @@ run_icbd() {
 	ICBD_PID=$!
 }
 
+fail() {
+	local msg
+
+	for msg in "$@"; do
+		FAIL_CNT=$((FAIL_CNT + 1))
+		echo "FAIL ${FAIL_CNT}: $msg" >&2
+	done
+	return 1
+}
+
 kill_icbd() {
 	$SUDO kill $ICBD_PID
 	wait $ICBD_PID >/dev/null 2>&1
 	ICBD_PID=
 }
 
-finish() {
+wait_for_clients() {
+	local failed=0
+
 	for pid in ${ICB_PIDS[@]}; do
-		wait $pid || {
-			FAIL_CNT=$((FAIL_CNT + 1))
-		}
+		wait $pid || failed=$((failed + 1))
 	done
+	FAIL_CNT=$((FAIL_CNT + $failed))
+	test $failed = 0
+	set -A ICB_PIDS --
+}
+
+finish() {
+	wait_for_clients || true
 	test -z "$ICBD_PID" || kill_icbd || true
-	test $FAIL_CNT -lt 0 || echo OK
+	test $FAIL_CNT -gt 0 || echo OK
 }
 
 trap finish EXIT
