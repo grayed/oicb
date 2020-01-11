@@ -819,7 +819,6 @@ save_history(char type, const char *peer, const char *msg, int incoming) {
 	char			*path;
 	const int		 datelen = 20;
 
-warnx("%s: type='%c' peer='%s' msg='%s' incomint=%d", __func__, type, peer, msg, incoming);
 	if (!enable_history)
 		return;
 
