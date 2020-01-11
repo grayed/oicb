@@ -155,7 +155,7 @@ void	 proceed_group_list(char *msg, size_t len);
 char	*null_completer(const char *text, int cmpl_state);
 
 struct history_file	*get_history_file(char *path);
-char	*get_save_path_for(char type, const char *peer);
+char	*get_save_path_for(char type, const char *peer, const char *msg);
 void	 save_history(char type, const char *peer, const char *msg,
 	              int incoming);
 void	 proceed_history(void);
@@ -423,12 +423,19 @@ create_dir_for(char *path) {
 }
 
 char*
-get_save_path_for(char type, const char *peer) {
+get_save_path_for(char type, const char *peer, const char *msg) {
 	int		 rv;
 	const char	*prefix;
 	char		*path;
 
-	if (type != 'c') {
+#define NO_SUCH_USER	"No such user "
+	if (type == 'e' &&
+	    strncmp(msg, NO_SUCH_USER, strlen(NO_SUCH_USER)) == 0) {
+		// Those errors occur happen in private chats,
+		// so it's logical to save them there.
+		peer = msg + strlen(NO_SUCH_USER);
+		prefix = "private-";
+	} else if (type != 'c') {
 		peer = room;
 		prefix = "room-";
 	} else {
@@ -812,12 +819,13 @@ save_history(char type, const char *peer, const char *msg, int incoming) {
 	char			*path;
 	const int		 datelen = 20;
 
+warnx("%s: type='%c' peer='%s' msg='%s' incomint=%d", __func__, type, peer, msg, incoming);
 	if (!enable_history)
 		return;
 
 	t = time(NULL);
 	now = localtime(&t);
-	path = get_save_path_for(type, peer);
+	path = get_save_path_for(type, peer, msg);
 	if (path == NULL)
 		goto fail;
 	hf = get_history_file(path);
