@@ -1,5 +1,13 @@
 
 ====================
+v.1.2.0
+====================
+
+* Implemented private chat nicknames history. See manpage for details.
+* Fixed printing of current state upon Ctrl+T.
+* Private chats are now sticky, allowing to paste multiple lines of text.
+
+====================
 v.1.1.3
 ====================
 
