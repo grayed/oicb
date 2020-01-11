@@ -112,7 +112,7 @@ char		 history_path[PATH_MAX];
 #define	PRIV_CHATS_MAX	5
 char		 priv_chats_nicks[PRIV_CHATS_MAX][NICKNAME_MAX];
 int		 priv_chats_cnt;
-int		 last_chat_was_priv;
+int		 repeat_priv_nick;
 
 enum SrvFeature {
 	Ping	= 0x01,
@@ -158,8 +158,13 @@ void	 save_history(char type, const char *who, const char *msg);
 void	 proceed_history(void);
 int	 create_dir_for(char *path);
 
+int	cmd_start(const char *line);
+int	cmd_end(const char *line);
 int	priv_cmd_end(const char *line);
 int	priv_nick_start(const char *line);
+int	priv_nick_end(const char *line);
+int	priv_msg_start(const char *line);
+
 void	update_nick_history(const char *cmdargs);
 int	list_priv_chats_nicks(int foo, int bar);
 int	cycle_priv_chats(int forward);
@@ -434,14 +439,45 @@ err:
 }
 
 // Input: command line, starting with /m or /msg.
+// Returns: index where command name starts, or 0 if no command name
+int
+cmd_start(const char *line) {
+	const char	*p = line;
+
+	if (*p++ != '/')
+		return 0;
+	while (*p != '\0' && isspace(*p))
+		p++;
+	if (!isalpha(*p))
+		return 0;
+	return (int)(p - line);
+}
+
+// Input: command line, starting with /m or /msg.
+// Returns: index of first char after command name, or 0 if no command name
+int
+cmd_end(const char *line) {
+	size_t		 idx;
+
+	if ((idx = cmd_start(line)) == 0)
+		return 0;
+	while (isalpha(line[idx]))
+		idx++;
+	return idx;
+}
+
+// Input: command line, starting with /m or /msg.
 // Returns: index where command name ends, or 0 if not /m or /msg.
 int
 priv_cmd_end(const char *line) {
-	const char	*p = line;
+	size_t		 idx;
+	const char	*p;
 
-	if (p[0] != '/' || p[1] != 'm')
+	if ((idx = cmd_start(line)) == 0)
 		return 0;
-	p += 2;
+	p = line + idx;
+	if (*p++ != 'm')
+		return 0;
 	if (p[0] == 's' && p[1] == 'g')
 		p += 2;
 	if (*p != '\0' && !isspace(*p))
@@ -464,12 +500,38 @@ priv_nick_start(const char *line) {
 	return idx;
 }
 
+// Input: command line, starting with /m or /msg.
+// Return: index of first char after nickname, or 0 if not /m or /msg, or no nickname.
+int
+priv_nick_end(const char *line) {
+	size_t	idx;
+
+	if ((idx = priv_nick_start(line)) == 0)
+		return 0;
+	while (line[idx] != '\0' && !isspace(line[idx]))
+		idx++;
+	return idx;
+}
+
+// Input: command line, starting with /m or /msg.
+// Return: index of message text, or 0 if not /m or /msg, or no message.
+int
+priv_msg_start(const char *line) {
+	size_t	idx;
+
+	if ((idx = priv_nick_end(line)) == 0)
+		return 0;
+	if (!isspace(line[idx]))
+		return 0;
+	return idx + 1;
+}
+
 // Input: private message command args, or NULL for public message.
 void
 update_nick_history(const char *cmdargs) {
 	if (debug >= 2)
 		warnx("%s: cmdargs='%s'", __func__, cmdargs);
-	if ((last_chat_was_priv = (cmdargs != NULL))) {
+	if (cmdargs != NULL) {
 		size_t	nicklen;
 		int	i;
 		char	tmp[NICKNAME_MAX];
@@ -858,18 +920,28 @@ proceed_user_input(char *line) {
 	if (!*p)
 		// add some insult like icb(1) does?
 		return;
-	if (line[0] == '/' && line[1]) {
-		line++;
-		n = strcspn(line, " \t");
-		if (line[n])
-			line[n] = '\001';
+	if (line[0] == '/' && line[1] && !isspace(line[1])) {
+		int	c_end, pc_end, nick_start, pms;
 
-		if ((n == 1 && line[0] == 'm') ||
-		    (n == 3 && memcmp(line, "msg", 3) == 0)) {
-			update_nick_history(&line[n + 1]);
-			save_history('c', "me", &line[n + 1]);
+		c_end = cmd_end(line);
+		pc_end = priv_cmd_end(line);
+		nick_start = priv_nick_start(line);
+		pms = priv_msg_start(line);
+		if (debug >= 2)
+			warnx("%s: c_end=%d pc_end=%d nick_start=%d pms=%d line='%s'",
+			    __func__, c_end, pc_end, nick_start, pms, line);
+
+		if (line[c_end])
+			line[c_end] = '\001';    // separate args
+
+		if (pc_end > 0) {
+			if (pms == 0)
+				return;    // skip empty line
+			update_nick_history(&line[nick_start]);
+			save_history('c', "me", &line[pms]);
+			repeat_priv_nick = 1;
 		}
-		push_icb_msg('h', line, strlen(line));
+		push_icb_msg('h', line + 1, strlen(line) - 1);
 		state = CommandSent;
 		return;
 	}
