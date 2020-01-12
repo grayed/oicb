@@ -272,27 +272,16 @@ proceed_chat_msg(char type, const char *author, const char *text) {
 
 void
 proceed_cmd_result(char *msg, size_t len) {
-	size_t	 bufsz;
-	char	*buf;
-
-	bufsz = len * 4 + 1;
-	if ((buf = malloc(bufsz)) == NULL)
-		err(1, __func__);
-	strvisx(buf, msg, len, VIS_SAFE|VIS_NOSLASH);
-	last_cmd_has_nl = (msg[len-1] == '\n');
-	push_stdout("%s", buf);
-	free(buf);
+	(void)len;
+	push_stdout_untrusted(msg);
+	push_stdout("\n");
 }
 
 void
 proceed_cmd_result_end(char *msg, size_t len) {
-	(void)msg;
 	(void)len;
-
-	if (last_cmd_has_nl)
-		last_cmd_has_nl = 0;
-	else
-		push_stdout("\n");
+	push_stdout_untrusted(msg);
+	push_stdout("\n");
 	state = Chat;
 }
 
@@ -300,8 +289,8 @@ void
 proceed_user_list(char *msg, size_t len) {
 	char		*p, *endptr;
 	const char	*peer_nick, *ident, *srcaddr;
-	int		 nicklen;
 	long long	 signedon, idle;
+	struct tm	 tm;
 
 	(void)len;
 
@@ -327,22 +316,16 @@ IP address/domain
 		push_stdout(" ");
 	peer_nick = p + 1;
 	p = strchr(peer_nick, '\001');
-	if (p != NULL) {
+	if (p != NULL)
 		*p = '\0';
-		nicklen = p - peer_nick;
-	} else {
-		nicklen = strlen(peer_nick);
-	}
-	(void)nicklen;	// TODO
 	push_stdout_untrusted(peer_nick);
+
 	if (p == NULL)
 		goto end;
 	p++;
 	idle = strtoll(p, &endptr, 10);
-	(void)idle;	// TODO
 	*endptr = '\0';
-	push_stdout_untrusted(p);
-	push_stdout("s");
+	push_stdout(" % 7llds", idle);
 	p = strchr(endptr + 1, '\001');
 	if (p == NULL)
 		goto end;
@@ -351,20 +334,28 @@ IP address/domain
 	signedon = strtoll(p, &endptr, 10);
 	if (*endptr != '\001' && *endptr != '\0')
 		goto end;
-	push_stdout_untrusted(ctime((time_t*)&signedon));
+	localtime_r((time_t*)&signedon, &tm);
+	// TODO: omit date when not needed? print 'today'/'yesterday'?..
+	push_stdout(" %d-%02d-%02d %02d:%02d:%02d",
+	            tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,
+	            tm.tm_hour, tm.tm_min, tm.tm_sec);
+	if (*endptr == '\0')
+		goto end;
 
 	ident = endptr + 1;
 	p = strchr(ident, '\001');
 	if (p != NULL)
 		*p = '\0';
+	push_stdout("\t");
 	push_stdout_untrusted(ident);
 	if (p == NULL)
 		goto end;
 
 	srcaddr = p + 1;
-	p = strchr(ident, '\001');
+	p = strchr(srcaddr, '\001');
 	if (p != NULL)
 		*p = '\0';
+	push_stdout("\t");
 	push_stdout_untrusted(srcaddr);
 
 end:
@@ -373,7 +364,7 @@ end:
 
 void
 proceed_group_list(char *msg, size_t len) {
-	int		 namelen, topiclen;
+	int		 name_out_len;
 	char		*name, *topic, *msgid;
 	const int	 min_name_len = 30;
 
@@ -389,15 +380,19 @@ proceed_group_list(char *msg, size_t len) {
 		*msgid++ = '\0';
 
 	push_stdout(strcmp(name, room) ? " " : "*");
-	namelen = push_stdout_untrusted(name);
-	if (namelen < min_name_len)
-		push_stdout("%*s", min_name_len - namelen, "");
+	name_out_len = push_stdout_untrusted(name);
+	if (name_out_len < min_name_len)
+		push_stdout("%*s", min_name_len - name_out_len, "");
 
-	topiclen = strlen(topic);
-	if (topiclen) {
+	if (*topic) {
 		push_stdout(" <");
 		push_stdout_untrusted(topic);
 		push_stdout(">");
+	}
+	if (msgid) {
+		push_stdout(" [");
+		push_stdout_untrusted(msgid);
+		push_stdout("]");
 	}
 	push_stdout("\n");
 }
