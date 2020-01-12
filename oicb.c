@@ -44,6 +44,7 @@
 #include <readline/readline.h>
 
 #include "oicb.h"
+#include "history.h"
 #include "private.h"
 
 #ifndef HAVE_RL_BIND_KEYSEQ
@@ -73,26 +74,7 @@ static const char *stream_names[] = {
 	"stdin",
 };
 
-SIMPLEQ_HEAD(icb_task_queue, icb_task) tasks_stdout, tasks_net;
-struct icb_task {
-	SIMPLEQ_ENTRY(icb_task)	it_entry;
-	size_t	  it_len;
-	size_t	  it_ndone;
-	void	 *it_cb_data;
-	void	(*it_cb)(struct icb_task *);
-	char	  it_data[0];
-};
-
-LIST_HEAD(history_files_list, history_file) history_files;
-struct history_file {
-	LIST_ENTRY(history_file)	hf_entry;
-	struct icb_task_queue	hf_tasks;
-	char	*hf_path;
-	size_t	 hf_ntasks;
-	int	 hf_fd;
-	int	 hf_permerr;      // failed to open?
-	time_t	 hf_last_access;
-};
+struct icb_task_queue tasks_stdout, tasks_net;
 
 int		 debug = 0;
 int		 sock = -1, histfile = -1;
@@ -103,8 +85,6 @@ char		*o_rl_buf = NULL;
 int		 o_rl_point, o_rl_mark;
 int		 pings_sent = 0;
 int		 last_cmd_has_nl = 0;
-int		 enable_history = 1;
-char		 history_path[PATH_MAX];
 
 #define	PRIV_CHATS_MAX	5
 char		 priv_chats_nicks[PRIV_CHATS_MAX][NICKNAME_MAX];
@@ -149,13 +129,6 @@ void	 proceed_user_list(char *msg, size_t len);
 void	 proceed_group_list(char *msg, size_t len);
 
 char	*null_completer(const char *text, int cmpl_state);
-
-struct history_file	*get_history_file(char *path);
-char	*get_save_path_for(char type, const char *peer, const char *msg);
-void	 save_history(char type, const char *peer, const char *msg,
-	              int incoming);
-void	 proceed_history(void);
-int	 create_dir_for(char *path);
 
 // readline wrappers
 int	cycle_priv_chats_forward(int key, int count);
@@ -365,88 +338,6 @@ push_icb_msg_extended(char type, const char *src, size_t len) {
 	SIMPLEQ_INSERT_TAIL(&tasks_net, it, it_entry);
 }
 
-/*
- * Creates directory recursively.
- * Given /foo/bar/buz as path, it'll attempt to create /foo/var directory.
- */
-int
-create_dir_for(char *path) {
-	int	 ec;
-	char	*slash;
-
-	slash = strrchr(path, '/');
-	if (slash == NULL) {
-		errno = EINVAL;
-		return -1;
-	}
-	*slash = '\0';
-	ec = mkdir(path, 0777);
-	if (ec != 0) {
-		if (errno == EEXIST)
-			ec = 0;
-		else if (errno == ENOENT) {
-			ec = create_dir_for(path);
-			if (ec != -1)
-				ec = mkdir(path, 0777);
-		}
-	}
-	*slash = '/';
-	return ec;
-}
-
-char*
-get_save_path_for(char type, const char *peer, const char *msg) {
-	int		 rv;
-	const char	*prefix;
-	char		*path;
-
-#define NO_SUCH_USER	"No such user "
-	if (type == 'e' &&
-	    strncmp(msg, NO_SUCH_USER, strlen(NO_SUCH_USER)) == 0) {
-		// Those errors occur happen in private chats,
-		// so it's logical to save them there.
-		peer = msg + strlen(NO_SUCH_USER);
-		prefix = "private-";
-	} else if (type != 'c') {
-		peer = room;
-		prefix = "room-";
-	} else {
-		prefix = "private-";
-	}
-
-	rv = asprintf(&path, "%s/%s%s.log", history_path, prefix, peer);
-	if (rv == -1)
-		return NULL;
-	return path;
-}
-
-struct history_file*
-get_history_file(char *path) {
-	struct history_file	*hf;
-
-	LIST_FOREACH(hf, &history_files, hf_entry) {
-		if (strcmp(hf->hf_path, path) == 0)
-			goto found;
-	}
-
-	hf = calloc(1, sizeof(struct history_file));
-	if (hf == NULL)
-		goto fail;
-	hf->hf_path = strdup(path);
-	if (create_dir_for(hf->hf_path) == -1)
-		goto fail;
-	hf->hf_fd = -1;    /* to be opened later */
-	SIMPLEQ_INIT(&hf->hf_tasks);
-	LIST_INSERT_HEAD(&history_files, hf, hf_entry);
-
-found:
-	return hf;
-
-fail:
-	free(hf);
-	return NULL;
-}
-
 // Input: line input from user
 // Returns: 1 if valid command found, 0 otherwise
 // Note: 'line' is not modified because struct fields being assigned are not.
@@ -537,104 +428,6 @@ list_priv_chats_nicks_wrapper(int key, int count) {
 	(void)count;
 	list_priv_chats_nicks();
 	return 0;
-}
-
-void	
-save_history(char type, const char *peer, const char *msg, int incoming) {
-	struct history_file	*hf;
-	struct icb_task		*it = NULL;
-	struct tm		*now;
-	size_t			 datasz;
-	time_t			 t;
-	char			*path;
-	const int		 datelen = 20;
-
-	if (!enable_history)
-		return;
-
-	t = time(NULL);
-	now = localtime(&t);
-	path = get_save_path_for(type, peer, msg);
-	if (path == NULL)
-		goto fail;
-	hf = get_history_file(path);
-	if (hf == NULL)
-		goto fail;
-
-	if (!incoming)
-		peer = "me";
-	datasz = datelen + strlen(peer) + 2 + strlen(msg) + 1;
-	it = calloc(1, sizeof(struct icb_task) + datasz);
-	if (it == NULL)
-		goto fail;
-	strftime(it->it_data, datasz, "%Y-%m-%d %H:%M:%S ", now);
-	strlcat(it->it_data, peer, datasz);
-	strlcat(it->it_data, ": ", datasz);
-	strlcat(it->it_data, msg, datasz);
-	it->it_len = datasz;
-	it->it_data[datasz - 1] = '\n';
-	SIMPLEQ_INSERT_TAIL(&hf->hf_tasks, it, it_entry);
-	return;
-
-fail:
-	warn(__func__);
-	free(path);
-}
-
-void	
-proceed_history(void) {
-	struct history_file	*hf, *thf;
-	struct icb_task	*it;
-	ssize_t			 nwritten;
-
-	LIST_FOREACH_SAFE(hf, &history_files, hf_entry, thf) {
-		if (hf->hf_permerr)
-			continue;
-		if (hf->hf_fd == -1) {
-			// error or reload happened
-			hf->hf_fd = open(hf->hf_path,
-			     O_WRONLY|O_CREAT|O_APPEND|O_NONBLOCK, 0666);
-			if (hf->hf_fd == -1) {
-				warnx("cannot open %s", hf->hf_path);
-				while (!SIMPLEQ_EMPTY(&hf->hf_tasks)) {
-					it = SIMPLEQ_FIRST(&hf->hf_tasks);
-					SIMPLEQ_REMOVE_HEAD(&hf->hf_tasks, it_entry);
-					free(it);
-				}
-				hf->hf_ntasks = 0;
-				hf->hf_permerr = 1;
-			}
-		}
-		while (!SIMPLEQ_EMPTY(&hf->hf_tasks)) {
-			it = SIMPLEQ_FIRST(&hf->hf_tasks);
-			do {
-				nwritten = write(hf->hf_fd,
-				    it->it_data + it->it_ndone,
-				    it->it_len - it->it_ndone);
-				if (nwritten == -1) {
-					if (errno == EAGAIN)
-						goto next_file;
-					warn("cannit write history to %s",
-					    hf->hf_path);
-					close(hf->hf_fd);
-					hf->hf_fd = -1;
-					goto next_file;
-				}
-				it->it_ndone += nwritten;
-			} while (it->it_ndone < it->it_len);
-			SIMPLEQ_REMOVE_HEAD(&hf->hf_tasks, it_entry);
-			free(it);
-		}
-		if (SIMPLEQ_EMPTY(&hf->hf_tasks) &&
-		    hf->hf_last_access < time(NULL)) {
-			LIST_REMOVE(hf, hf_entry);
-			free(hf->hf_path);
-			free(hf);
-		}
-next_file:
-		;
-	}
-
 }
 
 size_t
