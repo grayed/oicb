@@ -187,9 +187,9 @@ int	match_nick_from_history(const char *prefix, size_t prefixlen,
 int	cycle_priv_chats(int forward);
 
 // readline wrappers
-int	cycle_priv_chats_forward(int foo, int bar);
-int	cycle_priv_chats_backward(int foo, int bar);
-int	list_priv_chats_nicks_wrapper(int foo, int bar);
+int	cycle_priv_chats_forward(int key, int count);
+int	cycle_priv_chats_backward(int key, int count);
+int	list_priv_chats_nicks_wrapper(int key, int count);
 
 
 typedef void (*icb_msg_handler)(char *, size_t);
@@ -771,25 +771,25 @@ replace_nick:
 }
 
 int
-cycle_priv_chats_forward(int foo, int bar) {
-	(void)foo;
-	(void)bar;
-	cycle_priv_chats(1);
+cycle_priv_chats_forward(int key, int count) {
+	(void)key;
+	while (count-- > 0)
+		cycle_priv_chats(1);
 	return 0;
 }
 
 int
-cycle_priv_chats_backward(int foo, int bar) {
-	(void)foo;
-	(void)bar;
-	cycle_priv_chats(0);
+cycle_priv_chats_backward(int key, int count) {
+	(void)key;
+	while (count-- > 0)
+		cycle_priv_chats(0);
 	return 0;
 }
 
 int
-list_priv_chats_nicks_wrapper(int foo, int bar) {
-	(void)foo;
-	(void)bar;
+list_priv_chats_nicks_wrapper(int key, int count) {
+	(void)key;
+	(void)count;
 	list_priv_chats_nicks();
 	return 0;
 }
