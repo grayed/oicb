@@ -65,6 +65,7 @@ run_icbd() {
 	        -4 "127.0.0.1:${ICBD_PORT}" \
 		>"$icbd_logdir/icbd.log" 2>&1 &
 	ICBD_PID=$!
+	sleep 1		# give some time to start
 }
 
 fail() {
