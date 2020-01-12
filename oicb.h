@@ -25,6 +25,21 @@
 # define NICKNAME_MAX LOGIN_NAME_MAX
 #endif
 
+enum ICBState {
+	Connecting,
+	Connected,
+	LoginSent,
+	Chat,
+	CommandSent,
+};
+extern enum ICBState state;
+
+enum SrvFeatures {
+	Ping	= 0x01,
+	ExtPkt	= 0x02,
+};
+extern enum SrvFeatures srv_features;
+
 SIMPLEQ_HEAD(icb_task_queue, icb_task);
 struct icb_task {
 	SIMPLEQ_ENTRY(icb_task)	it_entry;
@@ -35,6 +50,7 @@ struct icb_task {
 	char	  it_data[0];
 };
 extern struct icb_task_queue	tasks_stdout;
+extern struct icb_task_queue	tasks_net;
 
 struct line_cmd {
 	char	*start;	// same as the parse_cmd_line() argument
@@ -60,6 +76,13 @@ void	 push_stdout_msg(const char *text);
 
 extern int		 debug;
 
+extern char	*nick;
+extern char	*hostname;
 extern char	*room;
+
+extern int	 repeat_priv_nick;
+extern int	 prefer_long_priv_cmd;
+
+extern volatile int	 want_exit;
 
 #endif // OICB_OICB_H

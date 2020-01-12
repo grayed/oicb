@@ -3,7 +3,7 @@
 # To build oicb under other OSes, please use CMake or write your own Makefile.
 #
 PROG =		oicb
-SRCS =		history.c oicb.c private.c
+SRCS =		chat.c history.c oicb.c private.c
 DPADD +=	${LIBREADLINE} ${LIBCURSES}
 LDADD +=	-lreadline -lcurses
 

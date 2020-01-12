@@ -7,6 +7,7 @@ find_package(Curses REQUIRED)
 find_package(Readline REQUIRED)
 
 add_executable(${CMAKE_PROJECT_NAME}
+	chat.c
 	history.c
 	oicb.c
 	private.c
