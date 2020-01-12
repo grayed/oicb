@@ -181,7 +181,7 @@ struct line_cmd {
 int	parse_cmd_line(char *line, struct line_cmd *cmd);
 
 void	update_nick_history(const char *peer_nick, const char *msg);
-int	list_priv_chats_nicks(int foo, int bar);
+int	list_priv_chats_nicks(void);
 int	match_nick_from_history(const char *prefix, size_t prefixlen,
 	                        int forward);
 int	cycle_priv_chats(int forward);
@@ -189,6 +189,7 @@ int	cycle_priv_chats(int forward);
 // readline wrappers
 int	cycle_priv_chats_forward(int foo, int bar);
 int	cycle_priv_chats_backward(int foo, int bar);
+int	list_priv_chats_nicks_wrapper(int foo, int bar);
 
 
 typedef void (*icb_msg_handler)(char *, size_t);
@@ -786,12 +787,17 @@ cycle_priv_chats_backward(int foo, int bar) {
 }
 
 int
-list_priv_chats_nicks(int foo, int bar) {
-	int	i;
-	char	buf[100];
-
+list_priv_chats_nicks_wrapper(int foo, int bar) {
 	(void)foo;
 	(void)bar;
+	list_priv_chats_nicks();
+	return 0;
+}
+
+int
+list_priv_chats_nicks() {
+	int	i;
+	char	buf[100];
 
 	if (priv_chats_cnt == 0) {
 		push_stdout_msg("there are no private chats yet\n");
@@ -1660,7 +1666,7 @@ main(int argc, char **argv) {
 
 	rl_bind_key('\t', cycle_priv_chats_forward);
 	rl_bind_keyseq("\\e[Z", cycle_priv_chats_backward);
-	rl_bind_key(CTRL('p'), list_priv_chats_nicks);
+	rl_bind_key(CTRL('p'), list_priv_chats_nicks_wrapper);
 	rl_bind_key(CTRL('t'), siginfo_cmd);
 	if (debug)
 		rl_bind_key(CTRL('x'), test_cmd);
