@@ -1,7 +1,10 @@
 
 ====================
-HEAD
+v.1.2.2
 ====================
+
+* Allow non-alphanumeric command names, e.g. "/?".
+* Fix group list formatting.
 
 ====================
 v.1.2.1
