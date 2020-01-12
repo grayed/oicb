@@ -108,9 +108,9 @@ void	 icb_connect(const char *addr, const char *port);
 char	*null_completer(const char *text, int cmpl_state);
 
 // readline wrappers
-int	cycle_priv_chats_forward(int key, int count);
-int	cycle_priv_chats_backward(int key, int count);
-int	list_priv_chats_nicks_wrapper(int key, int count);
+int	cycle_priv_chats_forward(int count, int key);
+int	cycle_priv_chats_backward(int count, int key);
+int	list_priv_chats_nicks_wrapper(int count, int key);
 
 
 
@@ -300,7 +300,7 @@ end:
 }
 
 int
-cycle_priv_chats_forward(int key, int count) {
+cycle_priv_chats_forward(int count, int key) {
 	(void)key;
 	while (count-- > 0)
 		cycle_priv_chats(1);
@@ -308,7 +308,7 @@ cycle_priv_chats_forward(int key, int count) {
 }
 
 int
-cycle_priv_chats_backward(int key, int count) {
+cycle_priv_chats_backward(int count, int key) {
 	(void)key;
 	while (count-- > 0)
 		cycle_priv_chats(0);
@@ -316,9 +316,9 @@ cycle_priv_chats_backward(int key, int count) {
 }
 
 int
-list_priv_chats_nicks_wrapper(int key, int count) {
-	(void)key;
+list_priv_chats_nicks_wrapper(int count, int key) {
 	(void)count;
+	(void)key;
 	list_priv_chats_nicks();
 	return 0;
 }
