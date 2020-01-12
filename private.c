@@ -244,9 +244,11 @@ update_nick_history(const char *peer_nick, const char *msg) {
 		int	i;
 
 		nicklen = strlen(peer_nick);
-		if (nicklen >= NICKNAME_MAX)
+		if (nicklen >= NICKNAME_MAX) {
 			push_stdout("%s: warning: nickname is too long\n",
 			                getprogname());
+			return;
+		}
 
 		if (priv_chats_cnt > 0 &&
 		    strcmp(priv_chats_nicks[0], peer_nick) == 0)
