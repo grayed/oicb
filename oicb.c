@@ -31,6 +31,7 @@
 #include <netdb.h>
 #include <poll.h>
 #include <resolv.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -176,23 +177,58 @@ restore_rl(void) {
 }
 
 /*
- * Queue text to be displayed.
+ * Queue text coming from trusted source to be displayed.
  *
- * The data pointer won't be accessed after return, its contents will be
+ * The data at 'text' won't be accessed after return, its contents will be
  * copied to internal buffer for the further processing.
+ *
+ * Returns number of bytes queued, not including terminating NUL.
  */
-void
-push_stdout_msg(const char *text) {
+int
+push_stdout(const char *text, ...) {
+	struct icb_task	*it;
+	int		 len;
+	va_list		 ap;
+
+	va_start(ap, text);
+	len = vsnprintf(NULL, 0, text, ap);
+	va_end(ap);
+	if (len == 0)
+		return 0;
+	it = calloc(1, sizeof(struct icb_task) + len + 1);
+	if (it == NULL)
+		err(1, __func__);
+	it->it_len = len + 1;
+	va_start(ap, text);
+	vsnprintf(it->it_data, len + 1, text, ap);
+	va_end(ap);
+	SIMPLEQ_INSERT_TAIL(&tasks_stdout, it, it_entry);
+	return len;
+}
+
+/*
+ * Queue text coming from possibly untrusted source to be displayed.
+ * The data will be processed with strvis(3) internally.
+ *
+ * The data at 'text' won't be accessed after return, its contents will be
+ * copied to internal buffer for the further processing.
+ *
+ * Returns number of bytes queued, not including terminating NUL.
+ */
+int
+push_stdout_untrusted(const char *text) {
 	struct icb_task	*it;
 	size_t		 len;
 
-	len = strlen(text) + 1;
-	it = calloc(1, sizeof(struct icb_task) + len);
+	len = strlen(text);
+	if (len == 0)
+		return 0;
+	it = calloc(1, sizeof(struct icb_task) + len * 4 + 1);
 	if (it == NULL)
 		err(1, __func__);
-	it->it_len = len;
-	memcpy(it->it_data, text, len);
+	it->it_len = strvis(it->it_data, text, VIS_SAFE|VIS_NOSLASH|VIS_NL) + 1;
 	SIMPLEQ_INSERT_TAIL(&tasks_stdout, it, it_entry);
+	return (int)it->it_len;
 }
 
 // Input: line input from user
@@ -374,9 +410,8 @@ get_next_icb_msg(size_t *msglen) {
 				err(1, "%s: read", __func__);
 			break;
 		} else if (nread == 0) {
-			push_stdout_msg("Server ");
-			push_stdout_msg(hostname);
-			push_stdout_msg(" closed connection, exiting...\n");
+			push_stdout("Server %s closed connection, exiting...\n",
+			                hostname);
 			want_exit = 1;
 			break;
 		}
@@ -506,14 +541,10 @@ icb_connect(const char *addr, const char *port) {
 				continue;
 			}
 			state = Connecting;
-			push_stdout_msg("Connecting to ");
-			push_stdout_msg(hostname);
-			push_stdout_msg("... ");
+			push_stdout("Connecting to %s ... ", hostname);
 		} else {
 			state = Connected;
-			push_stdout_msg("Connected to ");
-			push_stdout_msg(hostname);
-			push_stdout_msg("\n");
+			push_stdout("Connected to %s\n", hostname);
 		}
 		freeaddrinfo(res);
 		return;
@@ -672,27 +703,18 @@ main(int argc, char **argv) {
 
 	while (!want_exit) {
 		if (want_info) {
-			push_stdout_msg(getprogname());
-			push_stdout_msg(": ");
-			push_stdout_msg("sitting in room ");
-			push_stdout_msg(room);
-			push_stdout_msg(" at ");
-			push_stdout_msg(hostname);
-			if (port) {
-				push_stdout_msg(":");
-				push_stdout_msg(port);
-			}
-			push_stdout_msg(" as ");
-			push_stdout_msg(nick);
-			push_stdout_msg("\n");
+			push_stdout("%s: sitting in room %s at %s",
+			                getprogname(), room, hostname);
+			if (port)
+				push_stdout(":%s", port);
+			push_stdout(" as %s\n", nick);
 
-			if (debug) {
-				char	ibuf[1000];
-
-				snprintf(ibuf, sizeof(ibuf), "%s: rl_line_buffer=0x%p '%s' [%zu] rl_point=%d rl_mark=%d\n",
-				    getprogname(), rl_line_buffer, rl_line_buffer, strlen(rl_line_buffer), rl_point, rl_mark);
-				push_stdout_msg(ibuf);
-			}
+			if (debug)
+				push_stdout("%s: rl_line_buffer=0x%p '%s' [%zu] rl_point=%d rl_mark=%d\n",
+				                getprogname(),
+				                rl_line_buffer, rl_line_buffer,
+				                strlen(rl_line_buffer),
+				                rl_point, rl_mark);
 
 			want_info = 0;
 		}
@@ -723,7 +745,7 @@ main(int argc, char **argv) {
 		if (state == Connecting) {
 			// the only cause we're here is that connect(2) succeeded
 			state = Connected;
-			push_stdout_msg("connected\n");
+			push_stdout("connected\n");
 			continue;
 		}
 
@@ -736,7 +758,7 @@ main(int argc, char **argv) {
 				proceed_icb_msg(msg, msglen);
 		} else if (net_timeout &&
 		    ts_lastnetinput + net_timeout * max_pings < t) {
-			push_stdout_msg("Server timed out, exiting\n");
+			push_stdout("Server timed out, exiting\n");
 			want_exit = 1;
 		}
 		prepare_stdout();

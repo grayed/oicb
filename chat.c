@@ -224,8 +224,10 @@ err_invalid_msg(char type, const char *desc) {
  */
 void
 proceed_chat_msg(char type, const char *author, const char *text) {
-	size_t		 szbuf, curlen;
-	char		*buf;
+	size_t		 textlen;
+	char		 timebuf[sizeof("[00:00:00]")];
+	char		 author_vis[NICKNAME_MAX * 4 + 1];
+	char		*text_vis;
 	const char	*preuser, *postuser;
 	time_t		 t;
 
@@ -233,43 +235,39 @@ proceed_chat_msg(char type, const char *author, const char *text) {
 
 	switch (type) {
 	case 'c':
-		preuser  = " *";
-		postuser = "* ";
+		preuser  = postuser = "*";
 		break;
 	case 'd':
-		preuser  = " [=";
-		postuser = "=] ";
+		preuser  = "[=";
+		postuser = "=]";
 		break;
 	case 'e':
 	case 'k':
-		preuser  = " !";
-		postuser = "! ";
+		preuser  = postuser = "!";
 		break;
 	case 'f':
-		preuser  = " {";
-		postuser = "} ";
+		preuser  = "{";
+		postuser = "}";
 		break;
 	default:
-		preuser  = " <";
-		postuser = "> ";
+		preuser  = "<";
+		postuser = ">";
 	}
 
-	szbuf = sizeof("[00:00:00]\n") + strlen(preuser) + strlen(author)*4 +
-	    strlen(postuser) + strlen(text)*4;
-
-	if ((buf = malloc(szbuf)) == NULL)
-		err(1, __func__);
-
 	t = time(NULL);
-	strftime(buf, szbuf, "[%H:%M:%S]", localtime(&t));
-	curlen = strlcat(buf, preuser, szbuf);
-	strvis(buf + curlen, author, VIS_SAFE|VIS_NOSLASH);
-	curlen = strlcat(buf, postuser, szbuf);
-	strvis(buf + curlen, text, VIS_SAFE|VIS_NOSLASH);
-	if (strlcat(buf, "\n", szbuf) >= szbuf)
-		errx(1, "%s: internal error", __func__);
-	push_stdout_msg(buf);
-	free(buf);
+	strftime(timebuf, sizeof(timebuf), "[%H:%M:%S]", localtime(&t));
+
+	strnvis(author_vis, author, sizeof(author_vis), VIS_SAFE|VIS_NOSLASH);
+
+	// libbsd lacks stravis()
+	textlen = strlen(text);
+	if ((text_vis = malloc(textlen + 1)) == NULL)
+		err(1, __func__);
+	strvis(text_vis, text, VIS_SAFE|VIS_NOSLASH);
+
+	push_stdout("%s %s%s%s %s\n",
+	                timebuf, preuser, author_vis, postuser, text_vis);
+	free(text_vis);
 }
 
 void
@@ -282,7 +280,7 @@ proceed_cmd_result(char *msg, size_t len) {
 		err(1, __func__);
 	strvisx(buf, msg, len, VIS_SAFE|VIS_NOSLASH);
 	last_cmd_has_nl = (msg[len-1] == '\n');
-	push_stdout_msg(buf);
+	push_stdout("%s", buf);
 	free(buf);
 }
 
@@ -294,7 +292,7 @@ proceed_cmd_result_end(char *msg, size_t len) {
 	if (last_cmd_has_nl)
 		last_cmd_has_nl = 0;
 	else
-		push_stdout_msg("\n");
+		push_stdout("\n");
 	state = Chat;
 }
 
@@ -324,9 +322,9 @@ IP address/domain
 	}
 	*p = '\0';
 	if (p == msg + 1 && *msg == 'm')
-		push_stdout_msg("*");
+		push_stdout("*");
 	else
-		push_stdout_msg(" ");
+		push_stdout(" ");
 	peer_nick = p + 1;
 	p = strchr(peer_nick, '\001');
 	if (p != NULL) {
@@ -336,15 +334,15 @@ IP address/domain
 		nicklen = strlen(peer_nick);
 	}
 	(void)nicklen;	// TODO
-	push_stdout_msg(peer_nick);
+	push_stdout_untrusted(peer_nick);
 	if (p == NULL)
 		goto end;
 	p++;
 	idle = strtoll(p, &endptr, 10);
 	(void)idle;	// TODO
 	*endptr = '\0';
-	push_stdout_msg(p);
-	push_stdout_msg("s");
+	push_stdout_untrusted(p);
+	push_stdout("s");
 	p = strchr(endptr + 1, '\001');
 	if (p == NULL)
 		goto end;
@@ -353,13 +351,13 @@ IP address/domain
 	signedon = strtoll(p, &endptr, 10);
 	if (*endptr != '\001' && *endptr != '\0')
 		goto end;
-	push_stdout_msg(ctime((time_t*)&signedon));
+	push_stdout_untrusted(ctime((time_t*)&signedon));
 
 	ident = endptr + 1;
 	p = strchr(ident, '\001');
 	if (p != NULL)
 		*p = '\0';
-	push_stdout_msg(ident);
+	push_stdout_untrusted(ident);
 	if (p == NULL)
 		goto end;
 
@@ -367,17 +365,17 @@ IP address/domain
 	p = strchr(ident, '\001');
 	if (p != NULL)
 		*p = '\0';
-	push_stdout_msg(srcaddr);
+	push_stdout_untrusted(srcaddr);
 
 end:
-	push_stdout_msg("\n");
+	push_stdout("\n");
 }
 
 void
 proceed_group_list(char *msg, size_t len) {
-	size_t		 bufsz, namelen, topiclen;
-	char		*buf, *name, *topic, *msgid;
-	const size_t	 min_name_len = 30;
+	int		 namelen, topiclen;
+	char		*name, *topic, *msgid;
+	const int	 min_name_len = 30;
 
 	(void)len;
 
@@ -390,27 +388,18 @@ proceed_group_list(char *msg, size_t len) {
 	if ((msgid = strchr(topic, '\001')) != NULL)
 		*msgid++ = '\0';
 
-	namelen = strlen(name) + 1;    // 1 for current-group marker
+	push_stdout(strcmp(name, room) ? " " : "*");
+	namelen = push_stdout_untrusted(name);
+	if (namelen < min_name_len)
+		push_stdout("%*s", min_name_len - namelen, "");
+
 	topiclen = strlen(topic);
-	bufsz = ((namelen < topiclen) ? topiclen : namelen) * 4;
-	if (bufsz < min_name_len)
-		bufsz = min_name_len;
-	bufsz += 3;    // for marker, NUL and delimiter (space or \n)
-	if ((buf = malloc(bufsz)) == NULL)
-		err(1, __func__);
-	if (strcmp(name, room) == 0)
-		buf[0] = '*';
-	else
-		buf[0] = ' ';
-	strvis(buf + 1, name, VIS_SAFE|VIS_NOSLASH|VIS_NL);
-	namelen = strlen(buf);
-	for (; namelen <= min_name_len; namelen++)
-		(void) strlcat(buf, " ", bufsz);
-	push_stdout_msg(buf);
-	strvis(buf, topic, VIS_SAFE|VIS_NOSLASH|VIS_NL);
-	(void) strlcat(buf, "\n", bufsz);
-	push_stdout_msg(buf);
-	free(buf);
+	if (topiclen) {
+		push_stdout(" <");
+		push_stdout_untrusted(topic);
+		push_stdout(">");
+	}
+	push_stdout("\n");
 }
 
 /*
@@ -430,11 +419,7 @@ proceed_icb_msg(char *msg, size_t len) {
 	case 'a':	// login okay
 		if (state != LoginSent)
 			err_unexpected_msg(type);
-		push_stdout_msg("Logged in to room ");
-		push_stdout_msg(room);
-		push_stdout_msg(" as ");
-		push_stdout_msg(nick);
-		push_stdout_msg("\n");
+		push_stdout("Logged in to room %s as %s\n", room, nick);
 		state = Chat;
 		break;
 
@@ -473,7 +458,7 @@ proceed_icb_msg(char *msg, size_t len) {
 	case 'g':       // exit
 		if (state != Chat)
 			err_unexpected_msg(type);
-		push_stdout_msg("ICB: server said bye-bye\n");
+		push_stdout("ICB: server said bye-bye\n");
 		want_exit = 1;
 		break;
 
@@ -553,12 +538,7 @@ cmd_handler_found:
 		break;
 
 	default:
-		{
-			char nmsg[] =
-			    "unsupported message of type 'X', ignored\n";
-			/* yes, I'm lazy */
-			*strchr(nmsg, 'X') = type;
-			push_stdout_msg(nmsg);
-		}
+		push_stdout("unsupported message of type '%c', ignored\n",
+		                type);
 	}
 }

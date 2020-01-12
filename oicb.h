@@ -71,7 +71,10 @@ struct line_cmd {
 
 int	 parse_cmd_line(char *line, struct line_cmd *cmd);
 
-void	 push_stdout_msg(const char *text);
+int	 push_stdout_untrusted(const char *text);
+int	 push_stdout(const char *text, ...)
+	__attribute__((__format__ (printf, 1, 2)))
+	__attribute__((__nonnull__ (1)));
 
 
 extern int		 debug;

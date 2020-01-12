@@ -221,21 +221,15 @@ replace_nick:
 int
 list_priv_chats_nicks() {
 	int	i;
-	char	buf[100];
 
 	if (priv_chats_cnt == 0) {
-		push_stdout_msg("there are no private chats yet\n");
+		push_stdout("there are no private chats yet\n");
 		return 0;
 	}
 
-	snprintf(buf, sizeof(buf), "there are %d private chats:\n",
-	    priv_chats_cnt);
-	push_stdout_msg(buf);
-	for (i = 0; i < priv_chats_cnt; i++) {
-		push_stdout_msg("  * ");
-		push_stdout_msg(priv_chats_nicks[i]);
-		push_stdout_msg("\n");
-	}
+	push_stdout("there are %d private chats:\n", priv_chats_cnt);
+	for (i = 0; i < priv_chats_cnt; i++)
+		push_stdout("  * %s\n", priv_chats_nicks[i]);
 	return 0;
 }
 
@@ -250,11 +244,9 @@ update_nick_history(const char *peer_nick, const char *msg) {
 		int	i;
 
 		nicklen = strlen(peer_nick);
-		if (nicklen >= NICKNAME_MAX) {
-			push_stdout_msg(getprogname());
-			push_stdout_msg(": warning: nickname is too long\n");
-			return;
-		}
+		if (nicklen >= NICKNAME_MAX)
+			push_stdout("%s: warning: nickname is too long\n",
+			                getprogname());
 
 		if (priv_chats_cnt > 0 &&
 		    strcmp(priv_chats_nicks[0], peer_nick) == 0)
