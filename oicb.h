@@ -49,7 +49,6 @@ struct icb_task {
 	void	(*it_cb)(struct icb_task *);
 	char	  it_data[0];
 };
-extern struct icb_task_queue	tasks_stdout;
 extern struct icb_task_queue	tasks_net;
 
 struct line_cmd {

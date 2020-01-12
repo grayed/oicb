@@ -58,8 +58,6 @@ struct cmd_result_handler {
 	{ "c",	NULL }      // show one exact command description
 };
 
-static int	last_cmd_has_nl = 0;
-
 
 /*
  * Queue ICB messages to be sent to server.
