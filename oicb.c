@@ -247,7 +247,7 @@ parse_cmd_line(char *line, struct line_cmd *cmd) {
 	}
 	cmd->start = p++;
 
-	if (!isalpha(*p)) {
+	if (!*p || isspace(*p)) {
 		if (debug >= 2)
 			warnx("%s: not a command name, line='%s'",
 			   __func__, line);
@@ -255,7 +255,7 @@ parse_cmd_line(char *line, struct line_cmd *cmd) {
 	}
 	cmd->cmd_name = p;
 
-	while (isalpha(*p))
+	while (*p && !isspace(*p))
 		p++;
 	cmd->cmd_name_end = p;
 	cmd->cmd_name_len = (int)(p - cmd->cmd_name);
