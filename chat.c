@@ -445,6 +445,7 @@ proceed_icb_msg(char *msg, size_t len) {
 				    " switching to no-op messages");
 			break;
 		}
+		push_stdout("\007");
 		proceed_chat_msg(type, hostname, msg);
 		break;
 
@@ -508,7 +509,7 @@ cmd_handler_found:
 	case 'k':       // beep
 		if (state != Chat && state != CommandSent)
 			err_unexpected_msg(type);
-		proceed_chat_msg(type, "SERVER", "BEEP!");
+		proceed_chat_msg(type, "SERVER", "\007BEEP!");
 		break;
 
 	case 'l':       // ping
