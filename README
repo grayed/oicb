@@ -18,6 +18,7 @@ Things I'm willing to have but too lazy to do myself now:
   * Implement /query as /w wrapper.
   * Take care of /g and /name (update 'room' and 'nick').
   * Implement /beep (send beep character to console).
+  * Nicer group list formatting.
 
 _________
 [1] http://www.icb.net/, see the "Unix ICB Classic Client" link
