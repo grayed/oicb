@@ -197,7 +197,6 @@ proceed_user_input(char *line) {
 			prefer_long_priv_cmd = cmd.cmd_name_len == 3;
 		}
 		push_icb_msg('h', line + 1, strlen(line) - 1);
-		state = CommandSent;
 		return;
 	}
 
@@ -422,9 +421,7 @@ proceed_icb_msg(char *msg, size_t len) {
 	case 'f':	// important message
 	{
 		char	*text;
-		if (state == CommandSent)
-			state = Chat;
-		else if (state != Chat)
+		if (state != Chat)
 			err_unexpected_msg(type);
 		if ((text = strchr(msg, '\001')) == NULL)
 			err_invalid_msg(type, "missing text");
@@ -434,7 +431,7 @@ proceed_icb_msg(char *msg, size_t len) {
 	}
 
 	case 'e':	// error
-		if (state != Chat && state != CommandSent)
+		if (state != Chat)
 			want_exit = 1;
 		if (strcmp(msg, "Undefined message type 108") == 0) {
 			/* server doesn't support ping-pong */
@@ -461,7 +458,7 @@ proceed_icb_msg(char *msg, size_t len) {
 		int	 i;
 		char	*outtype;
 
-		if (state != CommandSent)
+		if (state != Chat)
 			err_unexpected_msg(type);
 		outtype = msg;
 		if ((msg = strchr(msg, '\001')) == NULL)
@@ -507,7 +504,7 @@ cmd_handler_found:
 	}
 
 	case 'k':       // beep
-		if (state != Chat && state != CommandSent)
+		if (state != Chat)
 			err_unexpected_msg(type);
 		proceed_chat_msg(type, "SERVER", "\007BEEP!");
 		break;

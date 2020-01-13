@@ -30,7 +30,6 @@ enum ICBState {
 	Connected,
 	LoginSent,
 	Chat,
-	CommandSent,
 };
 extern enum ICBState state;
 
