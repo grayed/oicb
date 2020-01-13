@@ -506,7 +506,7 @@ cmd_handler_found:
 	}
 
 	case 'k':       // beep
-		if (state != Chat)
+		if (state != Chat && state != CommandSent)
 			err_unexpected_msg(type);
 		proceed_chat_msg(type, "SERVER", "BEEP!");
 		break;
