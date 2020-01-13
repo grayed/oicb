@@ -17,7 +17,6 @@ Things I'm willing to have but too lazy to do myself now:
   * Start using <stdbool.h>.
   * Implement /query as /w wrapper.
   * Take care of /g and /name (update 'room' and 'nick').
-  * Implement /beep (send beep character to console).
   * Nicer group list formatting.
 
 _________

@@ -1,5 +1,11 @@
 
 ====================
+HEAD
+====================
+
+* Fixed exit due to false error upon receiving BEEP in some cases.
+
+====================
 v.1.2.2
 ====================
 
