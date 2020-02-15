@@ -1,9 +1,10 @@
 
 ====================
-HEAD
+v.1.2.3
 ====================
 
-* Fixed exit due to false error upon receiving BEEP in some cases.
+* Fixed exit due to false error condition in some other cases.
+* Fixed file handles leakage in history code.
 
 ====================
 v.1.2.2
