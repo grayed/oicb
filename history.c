@@ -178,7 +178,8 @@ proceed_history(void) {
 			hf->hf_fd = open(hf->hf_path,
 			     O_WRONLY|O_CREAT|O_APPEND|O_NONBLOCK, 0666);
 			if (hf->hf_fd == -1) {
-				warnx("cannot open %s", hf->hf_path);
+				warnx("cannot open '%s', disabling history", hf->hf_path);
+				enable_history = 0;
 				while (!SIMPLEQ_EMPTY(&hf->hf_tasks)) {
 					it = SIMPLEQ_FIRST(&hf->hf_tasks);
 					SIMPLEQ_REMOVE_HEAD(&hf->hf_tasks, it_entry);
