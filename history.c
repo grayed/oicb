@@ -211,6 +211,7 @@ proceed_history(void) {
 		if (SIMPLEQ_EMPTY(&hf->hf_tasks) &&
 		    hf->hf_last_access < time(NULL)) {
 			LIST_REMOVE(hf, hf_entry);
+			close(hf->hf_fd);
 			free(hf->hf_path);
 			free(hf);
 		}
