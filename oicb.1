@@ -56,6 +56,9 @@ The ICB server TCP port to use, defaulting to 7326.
 .It Ar room
 Name of the room to enter upon login.
 .El
+.Pp
+Up to 5 last nick names used for sending private messages during current
+login session are remembered.
 .Sh CHAT HISTORY
 By default,
 .Nm
@@ -66,18 +69,17 @@ Chatroom logs are prefixed with
 .Sq room-
 and private chats are prefixed with
 .Sq private- .
-.Pp
-Up to 5 last nick names used for sending private messages during current
-login session are remembered and could easily be recovered by
-.Ic TAB
-or
-.Ic Shift+TAB
-keys.
-Also, the
-.Ic ^P
-will display current private chat names history; this is mostly a
-debugging tool and may disappear in future releases without further
-notice, unless proven useful by users.
+.Sh KEY BINDINGS
+.Bl -tag -width "Shift+TAB" -compact
+.It Ic TAB
+Select next private chat.
+.It Ic Shift+TAB
+Select previous private chat.
+.It Ic ^P
+Display current private chat names history.
+.It Ic ^T
+Display information about current chatroom and user.
+.El
 .Sh SEE ALSO
 Other ICB implementations:
 .Lk http://www.icb.net/ .
