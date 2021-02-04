@@ -50,6 +50,9 @@ else()
 
 	list(APPEND BSD_DEFINITIONS -D_BSD_SOURCE=1 -D_GNU_SOURCE=1 -D_DEFAULT_SOURCE=1 -D_XOPEN_SOURCE=700)
 
+	# libbsd warns about OpenBSD vs. NetBSD strnvis incompatibility
+	list(APPEND BSD_DEFINITIONS -Wno-error=cpp)
+
 	add_definitions(${BSD_DEFINITIONS})
 	target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${BSD_INCLUDE_DIRS})
 	target_link_libraries(${CMAKE_PROJECT_NAME} ${BSD_LIBRARIES})
