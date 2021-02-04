@@ -1,5 +1,16 @@
 
 ====================
+v.1.2.4
+====================
+
+* Avoid cpath and wpath pledge when history saving is disabled.
+* Minor documentation tweaks.
+* Minor compile fixes (-fno-common and modern libbsd).
+* Make sure expect is installed before running tests.
+
+The input was mostly from Klemens Nanni, thanks!
+
+====================
 v.1.2.3
 ====================
 
