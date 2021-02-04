@@ -17,6 +17,12 @@ if [ $? -ne 0 ]; then
 	exit 1
 fi
 
+expect=$(command -v expect)
+if [ $? -ne 0 ]; then
+	echo "${0##*/}: please install expect first" >&2
+	exit 1
+fi
+
 HOME="$OICB_DIR"
 rm -Rf "${OICB_DIR}/.oicb"
 
@@ -40,7 +46,7 @@ run_oicb() {
 		echo 'set oicb_args [lrange $argv 0 end]'
 		echo "spawn -noecho \"${OICB_DIR}/oicb\" {*}\$oicb_args"
 		cat
-	} | expect -b - -- "${args[@]}" || {
+	} | $expect -b - -- "${args[@]}" || {
 		FAIL_CNT=$((FAIL_CNT + 1))
 		echo "$fail_text"
 		echo "expect log:"
