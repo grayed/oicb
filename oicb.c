@@ -555,6 +555,8 @@ icb_connect(const char *addr, const char *port) {
 
 void
 pledge_me() {
+	int	result;
+
 #ifdef HAVE_UNVEIL
 
 	if (enable_history) {
@@ -566,7 +568,11 @@ pledge_me() {
 #endif
 
 #ifdef HAVE_PLEDGE
-	if (pledge("stdio wpath cpath tty", NULL) == -1)
+	if (enable_history)
+		result = pledge("stdio wpath cpath tty", NULL);
+	else
+		result = pledge("stdio tty", NULL);
+	if (result == -1)
 		err(1, "pledge");
 #endif
 }
