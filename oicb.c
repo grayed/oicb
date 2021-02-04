@@ -555,7 +555,9 @@ icb_connect(const char *addr, const char *port) {
 
 void
 pledge_me() {
+#ifdef HAVE_PLEDGE
 	int	result;
+#endif
 
 #ifdef HAVE_UNVEIL
 	if (enable_history) {
