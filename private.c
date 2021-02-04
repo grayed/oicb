@@ -30,7 +30,6 @@
 static int	match_nick_from_history(const char *prefix, size_t prefixlen,
 	                        int forward);
 
-#define	PRIV_CHATS_MAX	5
 char		 priv_chats_nicks[PRIV_CHATS_MAX][NICKNAME_MAX];
 int		 priv_chats_cnt;
 int		 repeat_priv_nick;

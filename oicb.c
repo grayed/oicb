@@ -81,12 +81,6 @@ char		*o_rl_buf = NULL;
 int		 o_rl_point, o_rl_mark;
 int		 pings_sent = 0;
 
-#define	PRIV_CHATS_MAX	5
-char		 priv_chats_nicks[PRIV_CHATS_MAX][NICKNAME_MAX];
-int		 priv_chats_cnt;
-int		 repeat_priv_nick;
-int		 prefer_long_priv_cmd;
-
 
 void	 usage(const char *msg);
 void	 pledge_me(void);

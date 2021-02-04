@@ -81,6 +81,8 @@ extern char	*nick;
 extern char	*hostname;
 extern char	*room;
 
+#define	PRIV_CHATS_MAX	5
+extern char	 priv_chats_nicks[PRIV_CHATS_MAX][NICKNAME_MAX];
 extern int	 repeat_priv_nick;
 extern int	 prefer_long_priv_cmd;
 
