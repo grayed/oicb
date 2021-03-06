@@ -69,13 +69,14 @@ struct line_cmd {
 
 int	 parse_cmd_line(char *line, struct line_cmd *cmd);
 
-int	 push_stdout_untrusted(const char *text);
+int	 push_stdout_untrusted(const char *text, ...);
 int	 push_stdout(const char *text, ...)
 	__attribute__((__format__ (printf, 1, 2)))
 	__attribute__((__nonnull__ (1)));
 
 
 extern int		 debug;
+extern int		 utf8_ready;
 
 extern char	*nick;
 extern char	*hostname;
@@ -87,5 +88,6 @@ extern int	 repeat_priv_nick;
 extern int	 prefer_long_priv_cmd;
 
 extern volatile int	 want_exit;
+
 
 #endif // OICB_OICB_H

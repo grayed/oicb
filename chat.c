@@ -28,6 +28,7 @@
 #include "chat.h"
 #include "history.h"
 #include "private.h"
+#include "utf8.h"
 
 
 static void	 err_unexpected_msg(char type);
@@ -100,12 +101,17 @@ push_icb_msg_ws(char type, const char *msg, size_t len) {
 	do {
 		if (len > maxlen) {
 			msglen = maxlen;
-			if (type == 'b' || privmsg)
-				for (p = src + msglen - 1; p > src; p--)
-					if (isblank(*p) || ispunct(*p)) {
-						msglen = p - src + 1;
-						break;
-					}
+			if (type == 'b' || privmsg) {
+				if (utf8_ready)
+					msglen = mbsbreak(src, msglen);
+				else {
+					for (p = src + msglen - 1; p > src; p--)
+						if (isblank(*p) || ispunct(*p)) {
+							msglen = p - src + 1;
+							break;
+						}
+				}
+			}
 		} else
 			msglen = len;
 		if ((it = calloc(1, sizeof(struct icb_task) + msglen + commonlen + 3)) == NULL)
@@ -223,8 +229,6 @@ void
 proceed_chat_msg(char type, const char *author, const char *text) {
 	size_t		 textlen;
 	char		 timebuf[sizeof("[00:00:00]")];
-	char		 author_vis[NICKNAME_MAX * 4 + 1];
-	char		*text_vis;
 	const char	*preuser, *postuser;
 	time_t		 t;
 
@@ -253,18 +257,9 @@ proceed_chat_msg(char type, const char *author, const char *text) {
 
 	t = time(NULL);
 	strftime(timebuf, sizeof(timebuf), "[%H:%M:%S]", localtime(&t));
-
-	strnvis(author_vis, author, sizeof(author_vis), VIS_SAFE|VIS_NOSLASH);
-
-	// libbsd lacks stravis()
-	textlen = strlen(text);
-	if ((text_vis = malloc(textlen + 1)) == NULL)
-		err(1, __func__);
-	strvis(text_vis, text, VIS_SAFE|VIS_NOSLASH);
-
-	push_stdout("%s %s%s%s %s\n",
-	                timebuf, preuser, author_vis, postuser, text_vis);
-	free(text_vis);
+	push_stdout_untrusted("%s %s%s%s %s",
+	                      timebuf, preuser, author, postuser, text);
+	push_stdout("\n");
 }
 
 void

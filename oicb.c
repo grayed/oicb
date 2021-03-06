@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <locale.h>
 #include <netdb.h>
 #include <poll.h>
 #include <resolv.h>
@@ -48,6 +49,7 @@
 #include "chat.h"
 #include "history.h"
 #include "private.h"
+#include "utf8.h"
 
 #ifndef HAVE_RL_BIND_KEYSEQ
 static inline int	rl_bind_keyseq(const char *keyseq, int(*function)(int, int));
@@ -80,6 +82,7 @@ char		*nick, *hostname, *room;
 char		*o_rl_buf = NULL;
 int		 o_rl_point, o_rl_mark;
 int		 pings_sent = 0;
+int		 utf8_ready = 0;
 
 
 void	 usage(const char *msg);
@@ -202,7 +205,7 @@ push_stdout(const char *text, ...) {
 
 /*
  * Queue text coming from possibly untrusted source to be displayed.
- * The data will be processed with strvis(3) internally.
+ * The data will be processed with strvis(3) internally, if needed.
  *
  * The data at 'text' won't be accessed after return, its contents will be
  * copied to internal buffer for the further processing.
@@ -210,17 +213,40 @@ push_stdout(const char *text, ...) {
  * Returns number of bytes queued, not including terminating NUL.
  */
 int
-push_stdout_untrusted(const char *text) {
-	struct icb_task	*it;
-	size_t		 len;
+push_stdout_untrusted(const char *text, ...) {
+	struct icb_task	*it, *tmp = NULL;
+	size_t		 len, buflen;
+	va_list		 ap;
+	char		*fmtbuf;
 
-	len = strlen(text);
+	va_start(ap, text);
+	len = vsnprintf(NULL, 0, text, ap);
+	va_end(ap);
 	if (len == 0)
 		return 0;
-	it = calloc(1, sizeof(struct icb_task) + len * 4 + 1);
+
+	it = calloc(1, sizeof(struct icb_task) + len + 1);
 	if (it == NULL)
 		err(1, __func__);
-	it->it_len = strvis(it->it_data, text, VIS_SAFE|VIS_NOSLASH|VIS_NL) + 1;
+
+	va_start(ap, text);
+	vsnprintf(it->it_data, len + 1, text, ap);
+	va_end(ap);
+
+	if (utf8_ready && mbsvalidate(it->it_data) != -1) {
+		it->it_len = len + 1;
+		goto finish;
+	}
+
+	buflen = len * 4 + 1;
+	tmp = calloc(1, sizeof(struct icb_task) + buflen);
+	if (tmp == NULL)
+		err(1, __func__);
+	tmp->it_len = strvis(tmp->it_data, it->it_data, VIS_SAFE|VIS_NOSLASH|VIS_NL) + 1;
+	free(it);
+	it = tmp;
+
+finish:
 	SIMPLEQ_INSERT_TAIL(&tasks_stdout, it, it_entry);
 	return (int)it->it_len;
 }
@@ -589,10 +615,17 @@ main(int argc, char **argv) {
 	time_t		 ts_lastnetinput, t;
 	int		 ch, i, net_timeout, poll_timeout, max_pings;
 	char		*msg, *port = NULL;
-	const char	*errstr;
+	const char	*errstr, *locale;
 
 	SIMPLEQ_INIT(&tasks_stdout);
 	SIMPLEQ_INIT(&tasks_net);
+
+	locale = setlocale(LC_CTYPE, "");
+	if (strstr(locale, ".UTF-8")) {
+		utf8_ready = 1;
+		if (debug >= 1)
+			warnx("UTF-8 support detected");
+	}
 
 	net_timeout = 30;
 	while ((ch = getopt(argc, argv, "dHt:")) != -1) {
