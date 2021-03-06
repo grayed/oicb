@@ -11,6 +11,7 @@ add_executable(${CMAKE_PROJECT_NAME}
 	history.c
 	oicb.c
 	private.c
+	utf8.c
 	)
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
 	${CURSES_INCLUDE_DIRS}
