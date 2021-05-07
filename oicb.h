@@ -19,11 +19,7 @@
 
 #include <sys/queue.h>
 
-#if LOGIN_NAME_MAX >64
-# define NICKNAME_MAX 64
-#else
-# define NICKNAME_MAX LOGIN_NAME_MAX
-#endif
+#define NICKNAME_MAX 64
 
 enum ICBState {
 	Connecting,
