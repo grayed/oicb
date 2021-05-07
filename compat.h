@@ -1,5 +1,5 @@
 #ifndef __dead
-#define __dead	__attribute_((__noreturn__))
+#define __dead	__attribute__((__noreturn__))
 #endif
 
 #ifndef SIMPLEQ_HEAD
