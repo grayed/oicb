@@ -10,7 +10,9 @@
 #  Readline_INCLUDE_DIRS     The include directories needed to use readline.
 #  Readline_LIBRARIES        The libraries needed to use readline.
 
-set(Readline_PREFER_GNU NO CACHE BOOL "Prefer using the latest GNU readline we could find")
+if (NOT DEFINED Readline_PREFER_GNU)
+  set(Readline_PREFER_GNU NO CACHE BOOL "Prefer using the latest GNU readline we could find")
+endif()
 
 set(_Readline_PREFIX_HINTS)
 
