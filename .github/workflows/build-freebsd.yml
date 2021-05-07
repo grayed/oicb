@@ -15,7 +15,7 @@ jobs:
       uses: vmactions/freebsd-vm@v0.1.4
       with:
         usesh: true
-        prepare: pkg install -y cmake
+        prepare: pkg install -y cmake readline
         run: |
           mkdir build
           cd build
