@@ -42,12 +42,20 @@ endif()
 find_path(Readline_INCLUDE_DIR
     NAMES ${_Readline_TRY_HEADERS}
     HINTS ${_Readline_PREFIX_HINTS}
+    NO_DEFAULT_PATH
+)
+find_path(Readline_INCLUDE_DIR
+    NAMES ${_Readline_TRY_HEADERS}
 )
 set(Readline_INCLUDE_DIRS ${Readline_INCLUDE_DIR})
 
 find_library(Readline_LIBRARY
     NAMES ${_Readline_TRY_LIBS}
     HINTS ${_Readline_PREFIX_HINTS}
+    NO_DEFAULT_PATH
+)
+find_library(Readline_LIBRARY
+    NAMES ${_Readline_TRY_LIBS}
 )
 set(Readline_LIBRARIES ${Readline_LIBRARY})
 
