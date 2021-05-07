@@ -18,6 +18,7 @@
 #define OICB_OICB_H
 
 #include <sys/queue.h>
+#include "compat.h"
 
 #define NICKNAME_MAX 64
 

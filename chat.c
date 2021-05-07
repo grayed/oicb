@@ -24,7 +24,6 @@
 #include <time.h>
 #include <vis.h>
 
-#include "compat.h"
 #include "oicb.h"
 #include "chat.h"
 #include "history.h"
