@@ -21,3 +21,10 @@ jobs:
           cd build
           cmake -DCMAKE_BUILD_TYPE=Release ..
           make VERBOSE=1
+
+    - name: archive error logs
+      if:   failure()
+      uses: actions/upload-artifacts@v2
+      with:
+        name: freebsd-build-logs
+        path: build/**/*.log
