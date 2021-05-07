@@ -3,6 +3,11 @@ project(oicb C)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  # libedit (or whatever) from base system doesn't satisfy us
+  set(Readline_PREFER_GNU Yes)
+endif()
+
 find_package(Curses REQUIRED)
 find_package(Readline REQUIRED)
 
@@ -57,7 +62,11 @@ cmake_push_check_state()
 list(APPEND CMAKE_REQUIRED_INCLUDES ${Readline_INCLUDE_DIRS})
 list(APPEND CMAKE_REQUIRED_LIBRARIES ${Readline_LIBRARIES})
 check_symbol_exists(rl_bind_keyseq "stdio.h;readline/readline.h" HAVE_RL_BIND_KEYSEQ)
+check_symbol_exists(rl_mark "stdio.h;readline/readline.h" HAVE_RL_MARK)
 cmake_pop_check_state()
+if (NOT HAVE_RL_MARK)
+	message(SEND_ERROR "unusable readline detected, separate installation of GNU readline may help")
+endif()
 if (HAVE_RL_BIND_KEYSEQ)
 	add_definitions(-DHAVE_RL_BIND_KEYSEQ)
 endif()
