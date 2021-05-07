@@ -25,9 +25,11 @@ if (Readline_PREFER_GNU)
   
   if (_Readline_BREW_EXECUTABLE)
     execute_process(COMMAND ${_Readline_BREW_EXECUTABLE} --prefix readline
-                    OUTPUT VARIABLE _Readline_BREW_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE
-                    RESULT VARIABLE _Readline_BREW_PREFIX_RESULT
+                    OUTPUT_VARIABLE _Readline_BREW_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE
+                    ERROR_VARIABLE _Readline_BREW_ERORRS ERROR_STRIP_TRAILING_WHITESPACE
+                    RESULT_VARIABLE _Readline_BREW_PREFIX_RESULT
                    )
+    message(TRACE "brew errors: ${_Readline_BREW_ERORRS}")
     if (_Readline_BREW_PREFIX_RESULT EQUAL 0)
       set(_Readline_PREFIX_HINTS "${_Readline_BREW_PREFIX}")
     endif()
