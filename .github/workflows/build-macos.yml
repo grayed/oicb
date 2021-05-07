@@ -19,6 +19,10 @@ jobs:
 
     - name: build
       run: |
+        find / -name *readline*
+        echo FOOOOOO
+        find /usr/local
+        echo MOOOOOO
         cmake --trace-expand --trace-redirect=CMakeTrace.log -DCMAKE_BUILD_TYPE=Release ..
         make VERBOSE=1
       working-directory: build
