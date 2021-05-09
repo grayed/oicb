@@ -14,7 +14,8 @@ jobs:
     - name: install dependencies
       run: |
         brew install ncurses readline
-        brew link readline
+        brew link --force readline
+        find /usr/local/opt/readline
 
     - name: create build directory
       run: mkdir build
