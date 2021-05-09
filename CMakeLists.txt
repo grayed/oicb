@@ -9,7 +9,11 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif()
 
 find_package(Curses REQUIRED)
+if (APPLE)
+set(CMAKE_FIND_DEBUG_MODE True)
 find_package(Readline REQUIRED)
+set(CMAKE_FIND_DEBUG_MODE False)
+endif()
 
 add_executable(${CMAKE_PROJECT_NAME}
 	chat.c
