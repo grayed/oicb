@@ -581,7 +581,7 @@ pledge_me() {
 
 #ifdef HAVE_UNVEIL
 	if (enable_history) {
-		if (unveil(history_path, "rwc") == -1)
+		if (unveil(history_path, "wc") == -1)
 			err(1, "history unveil");
 	}
 	if (unveil(NULL, NULL) == -1)
