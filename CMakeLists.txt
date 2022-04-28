@@ -13,6 +13,8 @@ if (APPLE)
 set(CMAKE_FIND_DEBUG_MODE True)
 find_package(Readline REQUIRED)
 set(CMAKE_FIND_DEBUG_MODE False)
+else()
+find_package(Readline REQUIRED)
 endif()
 
 add_executable(${CMAKE_PROJECT_NAME}
