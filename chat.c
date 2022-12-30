@@ -97,7 +97,7 @@ push_icb_msg_ws(char type, const char *msg, size_t len) {
 	len -= commonlen;
 
 	// give a chance to server to prepend nickname field without breaking
-	maxlen = 253 - ((unsigned char)strlen(nick) + 1) - commonlen;
+	maxlen = 253 - ((unsigned char)nicklen + 1) - commonlen;
 	do {
 		if (len > maxlen) {
 			msglen = maxlen;

@@ -76,6 +76,7 @@ extern int		 debug;
 extern int		 utf8_ready;
 
 extern char	*nick;
+extern size_t	 nicklen;	// less than NICKNAME_MAX
 extern char	*hostname;
 extern char	*room;
 

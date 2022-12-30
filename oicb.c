@@ -79,6 +79,7 @@ int		 sock = -1, histfile = -1;
 volatile int	 want_exit = 0;
 volatile int	 want_info = 0;
 char		*nick, *hostname, *room;
+size_t		 nicklen;
 char		*o_rl_buf = NULL;
 int		 o_rl_point, o_rl_mark;
 int		 pings_sent = 0;
@@ -665,7 +666,8 @@ main(int argc, char **argv) {
 		hostname = argv[0];
 		nick = getlogin();
 	}
-	if (strlen(nick) >= NICKNAME_MAX)
+	nicklen = strlen(nick);
+	if (nicklen >= NICKNAME_MAX)
 		usage("too long nickname");
 
 	if (hostname[0] == '[') {

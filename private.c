@@ -239,11 +239,11 @@ update_nick_history(const char *peer_nick, const char *msg) {
 		warnx("%s: peer_nick='%s' msg='%s'", __func__, peer_nick, msg);
 
 	if (peer_nick != NULL) {
-		size_t	nicklen;
+		size_t	peer_nicklen;
 		int	i;
 
-		nicklen = strlen(peer_nick);
-		if (nicklen >= NICKNAME_MAX) {
+		peer_nicklen = strlen(peer_nick);
+		if (peer_nicklen >= NICKNAME_MAX) {
 			push_stdout("%s: warning: nickname is too long\n",
 			                getprogname());
 			return;
@@ -271,8 +271,8 @@ update_nick_history(const char *peer_nick, const char *msg) {
 set_top_nick:
 		if (debug >= 2)
 			warnx("%s: copying '%s' [%zu] to %p",
-			    __func__, peer_nick, nicklen, priv_chats_nicks[0]);
-		memcpy(priv_chats_nicks[0], peer_nick, nicklen);
-		memset(priv_chats_nicks[0] + nicklen, 0, NICKNAME_MAX - nicklen);
+			    __func__, peer_nick, peer_nicklen, priv_chats_nicks[0]);
+		memcpy(priv_chats_nicks[0], peer_nick, peer_nicklen);
+		memset(priv_chats_nicks[0] + peer_nicklen, 0, NICKNAME_MAX - peer_nicklen);
 	}
 }
