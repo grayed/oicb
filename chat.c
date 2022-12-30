@@ -23,6 +23,7 @@
 #include <string.h>
 #include <time.h>
 #include <vis.h>
+#include <unistd.h>
 
 #include "oicb.h"
 #include "chat.h"
@@ -229,8 +230,9 @@ void
 proceed_chat_msg(char type, const char *author, const char *text) {
 	size_t		 textlen;
 	char		 timebuf[sizeof("[00:00:00]")];
-	const char	*preuser, *postuser;
+	const char	*preuser, *postuser, *s;
 	time_t		 t;
+	int		 bell = 0;
 
 	save_history(type, author, text, 1);
 
@@ -254,6 +256,15 @@ proceed_chat_msg(char type, const char *author, const char *text) {
 		preuser  = "<";
 		postuser = ">";
 	}
+
+	if (type == 'c')
+		bell = 1;
+	else if ((s = strstr(text, nick)) != NULL)
+		bell = (s == text || isspace((unsigned char)s[-1])) &&
+		    !isalnum((unsigned char)s[nicklen]);
+
+	if (bell && isatty(STDOUT_FILENO))
+		putchar('\a');
 
 	t = time(NULL);
 	strftime(timebuf, sizeof(timebuf), "[%H:%M:%S]", localtime(&t));
