@@ -16,12 +16,12 @@ CFLAGS +=	-Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations
 CFLAGS +=	-Wshadow -Wpointer-arith -Wcast-qual -Wsign-compare
 
 # debugging helpers
-.PHONY: srv tcpdump test test2
+.PHONY: srv tcpdump client1 client2
 
-test: all
+client1: all
 	./${PROG} -d -t 3 tester@localhost:icb hall
 
-test2: all
+client2: all
 	./${PROG} -d -d -t 0 tester2@localhost:icb hall
 
 # relies on net/icbd being installed and set up
