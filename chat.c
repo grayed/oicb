@@ -107,7 +107,8 @@ push_icb_msg_ws(char type, const char *msg, size_t len) {
 					msglen = mbsbreak(src, msglen);
 				else {
 					for (p = src + msglen - 1; p > src; p--)
-						if (isblank(*p) || ispunct(*p)) {
+						if (isblank((unsigned char)*p) ||
+						    ispunct((unsigned char)*p)) {
 							msglen = p - src + 1;
 							break;
 						}
@@ -181,7 +182,7 @@ proceed_user_input(char *line) {
 		return;
 	}
 
-	for (p = line; isspace(*p); p++)
+	for (p = line; isspace((unsigned char)*p); p++)
 		;
 	if (!*p)
 		return;    // add some insult like icb(1) does?

@@ -268,7 +268,7 @@ parse_cmd_line(char *line, struct line_cmd *cmd) {
 	}
 	cmd->start = p++;
 
-	if (!*p || isspace(*p)) {
+	if (!*p || isspace((unsigned char)*p)) {
 		if (debug >= 2)
 			warnx("%s: not a command name, line='%s'",
 			   __func__, line);
@@ -276,7 +276,7 @@ parse_cmd_line(char *line, struct line_cmd *cmd) {
 	}
 	cmd->cmd_name = p;
 
-	while (*p && !isspace(*p))
+	while (*p && !isspace((unsigned char)*p))
 		p++;
 	cmd->cmd_name_end = p;
 	cmd->cmd_name_len = (int)(p - cmd->cmd_name);
@@ -290,7 +290,7 @@ parse_cmd_line(char *line, struct line_cmd *cmd) {
 	    (cmd->cmd_name_len == 3 && memcmp(cmd->cmd_name, "msg", 3) == 0)) {
 		cmd->is_private = 1;
 
-		while (isspace(*p))
+		while (isspace((unsigned char)*p))
 			p++;
 		if (!*p) {
 			cmd->private_prefix_len = (int)(p - line);
@@ -299,13 +299,13 @@ parse_cmd_line(char *line, struct line_cmd *cmd) {
 		cmd->peer_nick = p;
 		cmd->peer_nick_offset = (int)(p - line);
 
-		while (*p && !isspace(*p))
+		while (*p && !isspace((unsigned char)*p))
 			p++;
 		cmd->peer_nick_end = p;
 		cmd->peer_nick_len = (int)(p - cmd->peer_nick);
 		cmd->private_prefix_len = (int)(p - line);
 
-		if (isspace(*p)) {
+		if (isspace((unsigned char)*p)) {
 			cmd->private_msg = ++p;
 			cmd->private_prefix_len++;
 		}
