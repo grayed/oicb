@@ -24,7 +24,7 @@ if (Readline_PREFER_GNU)
   mark_as_advanced(_Readline_BREW_EXECUTABLE)
   
   message(NOTICE "_Readline_BREW_EXECUTABLE is ${_Readline_BREW_EXECUTABLE}")
-  if (_Readline_BREW_EXECUTABLE)
+  if (${_Readline_BREW_EXECUTABLE})
     execute_process(COMMAND ${_Readline_BREW_EXECUTABLE} --prefix readline
                     OUTPUT_VARIABLE _Readline_BREW_PREFIX OUTPUT_STRIP_TRAILING_WHITESPACE
                     ERROR_VARIABLE _Readline_BREW_ERORRS ERROR_STRIP_TRAILING_WHITESPACE
