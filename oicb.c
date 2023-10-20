@@ -164,7 +164,7 @@ restore_rl(void) {
 	} else {
 		len = strlen(o_rl_buf);
 		rl_extend_line_buffer(len+2);
-		(void) strlcpy(rl_line_buffer, o_rl_buf, len+1);
+		memcpy(rl_line_buffer, o_rl_buf, len+1);
 		rl_point = o_rl_point;
 		rl_mark = o_rl_mark;
 		rl_redisplay();
